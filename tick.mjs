@@ -11,7 +11,7 @@ const SCALE = Math.min(128, Math.max(0.5, Number(fileScale) || Number(process.en
 const now = Date.now();
 let meta;
 let raw = null;
-if (fs.existsSync(FILE)) { raw = JSON.parse(fs.readFileSync(FILE, 'utf8')); if (!raw.state || raw.state.v !== 3) { console.log('Old world format, starting a new one'); raw = null; } }
+if (fs.existsSync(FILE)) { raw = JSON.parse(fs.readFileSync(FILE, 'utf8')); if (!raw.state || raw.state.v < 3) { console.log('Old world format, starting a new one'); raw = null; } }
 if (raw) {
   meta = raw.meta || {};
   Sim.load(raw.state);
@@ -19,10 +19,12 @@ if (raw) {
   console.log(`Fast-forwarding ${elapsed.toFixed(0)} s of village life`);
   Sim.advance(elapsed);
   try {
-    const S0 = Sim.S;
-    if (process.env.GITHUB_TOKEN && S0.invq.length < 2) {
-      const r = await consult(Sim.helpers.summary(), process.env.GITHUB_TOKEN);
-      console.log('Council proposed', Sim.helpers.applyCouncil(r), 'inventions');
+    const H = Sim.helpers, S0 = Sim.S;
+    const cand = S0.tribes.filter((c) => c.alive && c.invq.length < 2);
+    if (process.env.GITHUB_TOKEN && cand.length) {
+      const c = cand[Math.floor(now / 60000) % cand.length];
+      const r = await consult(H.withT(c, () => H.summary()), process.env.GITHUB_TOKEN);
+      console.log('Council of', c.name, 'proposed', H.withT(c, () => H.applyCouncil(r)), 'inventions');
     }
   } catch (e) { console.log('Council unavailable:', String(e.message || e).slice(0, 200)); }
 } else {
@@ -33,6 +35,6 @@ if (raw) {
 meta.savedAt = now;
 meta.scale = SCALE;
 meta.bornAt = meta.bornAt || now;
-fs.writeFileSync(FILE, JSON.stringify({ meta, state: Sim.S }));
-const S = Sim.S;
-console.log(`day ${Math.floor(S.time / Sim.DAYLEN) + 1} | pop ${S.vill.length} | buildings ${S.blds.length} | techs ${Object.keys(S.tech.done).length} | islands ${S.islands}`);
+const snap = Sim.snapshot();
+fs.writeFileSync(FILE, JSON.stringify({ meta, state: snap }));
+console.log(`day ${Math.floor(snap.time / Sim.DAYLEN) + 1} | peoples ${snap.tribes.filter((c) => c.alive).map((c) => c.name + ':' + c.vill.length).join(', ')}`);
