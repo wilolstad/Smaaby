@@ -1,13 +1,14 @@
 name: Småby tick
 on:
   schedule:
-    - cron: '*/5 * * * *'
+    - cron: '*/10 * * * *'
   workflow_dispatch:
   push:
     branches: [main]
-    paths: ['.github/workflows/tick.yml']
+    paths: ['.github/workflows/tick.yml', 'loop.sh']
 permissions:
   contents: write
+  actions: write
   models: read
 concurrency:
   group: smaaby-tick
@@ -15,26 +16,14 @@ concurrency:
 jobs:
   tick:
     runs-on: ubuntu-latest
-    timeout-minutes: 12
+    timeout-minutes: 355
     steps:
       - uses: actions/checkout@v4
       - uses: actions/setup-node@v4
         with:
           node-version: 20
-      - name: Fetch previous world state (if any)
-        run: git fetch origin state --depth=1 && git show FETCH_HEAD:state.json > state.json || echo "no previous state"
-      - name: Advance the village
-        run: node tick.mjs
+      - name: Run the village (ticks every minute)
+        run: ./loop.sh
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-      - name: Publish state (single force-pushed commit, no history bloat)
-        run: |
-          mkdir ../out && cp state.json ../out/
-          cd ../out
-          git init -q -b state
-          git config user.name "smaaby-bot"
-          git config user.email "smaaby-bot@users.noreply.github.com"
-          git add state.json
-          git commit -qm "state $(date -u +%FT%TZ)"
-          git push -f "https://x-access-token:${{ secrets.GITHUB_TOKEN }}@github.com/${{ github.repository }}.git" state
-# format v3
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
