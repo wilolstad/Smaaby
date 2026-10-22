@@ -40,7 +40,7 @@
   const EFFECTS = { farm_growth: 'Åkrene gror raskere', work_speed: 'Alt arbeid går raskere', carry: 'Bærer mer per tur', walk: 'Går raskere', research: 'Forskning går raskere', build: 'Bygger raskere', food_save: 'Mindre matsvinn', pop_cap: 'Plass til flere innbyggere' };
   const ROOFS = ['flat', 'pointed', 'dome', 'none'];
   let S = null;
-  const TK = ['vill', 'sites', 'blds', 'storages', 'res', 'tech', 'inv', 'invInfo', 'defs', 'invq', 'goal', 'thoughts', 'islands', 'stats', 'nInv', 'growT', 'eatT', 'planT', 'scanT', 'drownT', 'reach', 'landReach', 'lastReach', 'noSpot', 'hungerDay', 'expLogged', 'cul', 'ethos', 'expT'];
+  const TK = ['vill', 'sites', 'blds', 'storages', 'res', 'tech', 'inv', 'invInfo', 'defs', 'invq', 'goal', 'thoughts', 'islands', 'stats', 'nInv', 'growT', 'eatT', 'planT', 'scanT', 'drownT', 'reach', 'landReach', 'lastReach', 'noSpot', 'hungerDay', 'expLogged', 'cul', 'ethos', 'expT', 'hungry'];
   const PAL = [[205, 72, 62], [66, 124, 214], [232, 172, 44], [92, 172, 94], [166, 96, 204], [44, 172, 172], [224, 114, 164], [146, 146, 156]];
   const TNAMES = ['Nordvik', 'Zhaoling', 'Kalahar', 'Ostmark', 'Mbali', 'Vesterhavn', 'Qianlu', 'Tarsis', 'Ravnholt', 'Solvang', 'Hanor', 'Umoja'];
   function use(c) { if (S.ct === c) return; if (S.ct) save(S.ct); for (const k of TK) S[k] = c[k]; S.ct = c; }
@@ -619,14 +619,14 @@
   function fire() {
     const bl = S.blds.map(T).filter((b) => b && b.type !== 'fire'); if (bl.length < 5) return;
     const c = bl[Math.floor(R() * bl.length)]; let lost = 0;
-    for (const b of bl) if (Math.hypot(b.x - c.x, b.y - c.y) <= 3.5 && R() < 0.75) { destroyBld(b); lost++; }
+    for (const b of bl) if (Math.hypot(b.x - c.x, b.y - c.y) <= 2.5 && R() < 0.5) { destroyBld(b); lost++; }
     for (let y = Math.floor(c.y) - 4; y <= c.y + 4; y++) for (let x = Math.floor(c.x) - 4; x <= c.x + 4; x++) { const g = G(x, y), o = OB(g); if (o && o.type === 'tree' && Math.hypot(x - c.x, y - c.y) < 4.2) dropObj(o); }
     log('Brann! ' + lost + ' bygg brant ned.');
   }
   function flood() {
     const coast = []; for (let y = 1; y < GH - 1; y++) for (let x = 1; x < GW - 1; x++) { const g = G(x, y); if (S.reach[y * GW + x] && g.k !== 'water' && NB4.some(([dx, dy]) => G(x + dx, y + dy).k === 'water')) coast.push([x, y]); }
     if (!coast.length) return;
-    const [cx, cy] = coast[Math.floor(R() * coast.length)], r = 3 + R() * 3; let n = 0, lost = 0;
+    const [cx, cy] = coast[Math.floor(R() * coast.length)], r = 2 + R() * 1.5; let n = 0, lost = 0;
     for (let y = Math.floor(cy - r); y <= cy + r; y++) for (let x = Math.floor(cx - r); x <= cx + r; x++) {
       const g = G(x, y); if (!g || g.k === 'water' || Math.hypot(x - cx, y - cy) > r || g.h > 1) continue;
       const o = OB(g); if (o) {
@@ -786,7 +786,7 @@
     S.eatT += dt;
     if (S.eatT >= 60) {
       S.eatT = 0; S.res.food = Math.max(0, S.res.food - Math.ceil(S.vill.length * (hasTech('medicine') ? 0.45 : 0.6) / eff('food_save')));
-      if (S.res.food <= 0) { if (S.hungerDay !== S.lastDay) { S.hungerDay = S.lastDay; log('Det er tomt for mat. Folk sulter.'); } const n = Math.max(1, Math.floor(S.vill.length * 0.08)); for (let i = 0; i < n && S.vill.length > 2; i++) die(S.vill[Math.floor(R() * S.vill.length)], 'sultet i hjel'); }
+      if (S.res.food <= 0) { S.hungry = (S.hungry || 0) + 1; if (S.hungry >= 2) { if (S.hungerDay !== S.lastDay) { S.hungerDay = S.lastDay; log('Det er tomt for mat. Folk sulter.'); } const n = Math.max(1, Math.floor(S.vill.length * 0.03)); for (let i = 0; i < n && S.vill.length > 3; i++) die(S.vill[Math.floor(R() * S.vill.length)], 'sultet i hjel'); } } else S.hungry = 0;
     }
     S.drownT = (S.drownT || 0) - dt;
     if (S.drownT <= 0) { S.drownT = 3; for (const v of S.vill.slice()) { const g = G(Math.floor(v.x), Math.floor(v.y)); if (g && g.k === 'water') die(v, 'druknet'); } }
@@ -811,8 +811,8 @@
     }
     for (const c of S.tribes) if (c.alive) { use(c); stepTribe(dt); }
     if (S.ct) save(S.ct);
-    S.disT = (S.disT === undefined ? 1500 : S.disT) - dt;
-    if (S.disT <= 0) { S.disT = 600 + R() * 1400 / Math.max(1, S.tribes.length * 0.6); const al = alive(); if (al.length) withT(al[Math.floor(R() * al.length)], () => { if (R() < 0.5) fire(); else flood(); }); }
+    S.disT = (S.disT === undefined ? 6000 : S.disT) - dt;
+    if (S.disT <= 0) { S.disT = 5000 + R() * 7000; const al = alive().filter((c) => c.vill.length >= 25); if (al.length) withT(al[Math.floor(R() * al.length)], () => { if (R() < 0.5) fire(); else flood(); }); }
     S.riseT = (S.riseT === undefined ? 2400 : S.riseT) - dt;
     if (S.riseT <= 0) { S.riseT = 2400 + R() * 3600; riseIsland(); }
     S.warT = (S.warT || 0) + dt; if (S.warT >= 1) { S.warT = 0; warStep(); }

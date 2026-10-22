@@ -139,25 +139,33 @@ function stepFx(dt){for(const p of fx){p.life-=dt;if(p.k==='p'){p.x+=p.vx*dt;p.y
 const $=id=>document.getElementById(id);
 let shown=0;
 function renderLog(){const el=$('log');const items=S.log.slice(-5);const key=items.length?items[items.length-1].t+items[items.length-1].text:'';if(renderLog.k===key)return;renderLog.k=key;el.replaceChildren(...items.map(l=>{const d=document.createElement('div');d.textContent=l.text;return d}))}
+let panelOpen=(function(){try{const s=localStorage.getItem('smaaby.panel');if(s!==null)return s==='1'}catch(e){}return innerWidth>=700})();
 const REL={war:'⚔ krig',trade:'⇄ handel',peace:''};
 function hud(){
  if(!curT||!curT.alive){curT=S.tribes.filter(t=>t.alive).sort((a,b)=>b.vill.length-a.vill.length)[0]||S.tribes[0]}
  const p=h.phase(),lab=p<.12?'morgen':p<.55?'dag':p<.7?'kveld':p<.92?'natt':'daggry';
  $('clock').textContent='Dag '+(Math.floor(S.time/Sim.DAYLEN)+1)+' · '+lab+' · '+speed+'×'+(note?' · '+note:'');
+ const te=document.createElement('div'),host=$('tech');
  h.withT(curT,()=>{
  const r=S.res;$('rw').textContent=Math.floor(r.wood);$('rs').textContent=Math.floor(r.stone);$('rf').textContent=Math.floor(r.food);$('rp').textContent=S.vill.length+'/'+h.cap();$('rb').textContent=S.blds.length;$('ri').textContent=S.islands;
  const pt=$('pt');pt.textContent='';const dot=document.createElement('i');dot.className='dot';dot.style.background='rgb('+curT.color.join(',')+')';pt.appendChild(dot);pt.appendChild(document.createTextNode(curT.name));
- const te=$('tech'),cur=S.tech.cur,done=Object.keys(S.tech.done).concat(Object.keys(S.inv));const TI=h.techInfo;te.replaceChildren();
+ const cur=S.tech.cur,done=Object.keys(S.tech.done).concat(Object.keys(S.inv));const TI=h.techInfo;
  const b=document.createElement('b');b.textContent=cur?'Forsker på: '+TI(cur).n:'Alt er oppfunnet';te.appendChild(b);
  if(cur){const bar=document.createElement('div');bar.className='bar';const i=document.createElement('i');i.style.width=Math.min(100,100*S.tech.prog/TI(cur).cost)+'%';bar.appendChild(i);te.appendChild(bar);const d=document.createElement('small');d.textContent=TI(cur).d+(TI(cur).src?' · '+TI(cur).src:'');te.appendChild(d)}
  const l=document.createElement('div');l.style.marginTop='6px';const sm=document.createElement('small');sm.textContent=h.trait2label(curT)+' · '+(S.goal?'Mål: '+S.goal+' · ':'')+'Funnet ('+done.length+'): '+(done.slice(-6).map(k=>TI(k).n).join(', ')||'ingenting ennå');l.appendChild(sm);te.appendChild(l);
  });
- const te=$('tech'),pl=document.createElement('div');pl.style.marginTop='8px';
+ const pl=document.createElement('div');pl.style.marginTop='8px';
  for(const t of S.tribes){if(!t.alive)continue;const row=document.createElement('button');row.type='button';row.style.cssText='display:flex;gap:6px;align-items:center;width:100%;text-align:left;margin-top:3px;padding:4px 7px;min-height:26px;font-size:11px';row.setAttribute('aria-pressed',t===curT);
   const d=document.createElement('i');d.className='dot';d.style.background='rgb('+t.color.join(',')+')';row.appendChild(d);
   const rels=S.tribes.filter(o=>o.alive&&o!==t&&h.relOf(t.id,o.id)!=='peace').map(o=>(REL[h.relOf(t.id,o.id)])+' '+o.name).join(', ');
   row.appendChild(document.createTextNode(t.name+' · '+t.vill.length+' · '+h.trait2label(t)+(rels?' · '+rels:'')));row.onclick=()=>{curT=t;hud()};pl.appendChild(row)}
  te.appendChild(pl);
+ const keep=S.tribes.length&&curT&&h.withT(curT,()=>S.tech.cur)?2:1;
+ if(!panelOpen)while(te.children.length>keep)te.lastChild.remove();
+ const tg=document.createElement('button');tg.type='button';tg.textContent=panelOpen?'▴':'▾';tg.setAttribute('aria-label','Vis eller skjul panelet');tg.style.cssText='position:absolute;top:6px;right:6px;min-height:26px;padding:2px 9px';tg.onclick=()=>{panelOpen=!panelOpen;try{localStorage.setItem('smaaby.panel',panelOpen?'1':'0')}catch(e){}hud()};te.appendChild(tg);
+ const sig=te.textContent+'|'+panelOpen+'|'+curT.id;
+ if(host._sig===sig){const a=host.querySelector('.bar i'),b2=te.querySelector('.bar i');if(a&&b2)a.style.width=b2.style.width}
+ else{host._sig=sig;host.replaceChildren(...te.childNodes)}
  const c=$('card');if(selected&&!selected.dead){c.hidden=false;const v=selected;c.replaceChildren();const s=document.createElement('strong');s.textContent=v.name+(v._t?' · '+v._t.name:'');c.appendChild(s);
   const l1=document.createElement('div');l1.textContent=(v.sleeping?'Sover':ROLEN[v.role]||'')+' · '+v.trait;c.appendChild(l1);
   const l2=document.createElement('div');const sp=document.createElement('span');sp.textContent=v.carry?'Bærer '+v.carry.n+' '+RESN[v.carry.t]:(v.state==='walk'?'På vei':v.state==='work'?'Jobber':'Venter');l2.appendChild(sp);c.appendChild(l2);
@@ -197,7 +205,7 @@ const STATE_URL=(function(){const m=location.hostname.match(/^([^.]+)\.github\.i
 let last=performance.now(),hudT=0;
 function loop(now){
  const dt=Math.min(.1,(now-last)/1000);last=now;
- if(!paused){let rem=dt*speed;while(rem>0){const s=Math.min(rem>.6?.5:.1,rem);Sim.step(s);rem-=s}drainEv();stepFx(dt)}
+ if(!paused){let rem=dt*speed;try{while(rem>0){const s=Math.min(rem>.6?.5:.1,rem);Sim.step(s);rem-=s}}catch(e){console.error(e)}drainEv();stepFx(dt)}
  frame(now);hudT-=dt;if(hudT<=0){hudT=.2;hud()}
  requestAnimationFrame(loop)}
 function start(){
@@ -207,9 +215,9 @@ function start(){
 function boot(){fetch(STATE_URL+'?'+Date.now()).then(r=>{if(!r.ok)throw 0;return r.json()}).then(j=>{
  if(!j.state||j.state.v<3)throw 1;Sim.load(j.state);savedAt=j.meta.savedAt||Date.now();
  scale=j.meta.scale||1;speed=scale;markSpeed();
- let behind=Math.min(300,Math.max(0,(Date.now()-savedAt)/1000*scale));
+ let behind=Math.min(60,Math.max(0,(Date.now()-savedAt)/1000*scale));
  const total=behind;
- (function chunk(){const t0=performance.now();while(behind>0&&performance.now()-t0<30){Sim.step(.5);behind-=.5}
+ (function chunk(){const t0=performance.now();try{while(behind>0&&performance.now()-t0<30){Sim.step(.5);behind-=.5}}catch(e){console.error(e);behind=0}
   $('clock').textContent='Henter inn '+Math.round(100*(1-behind/Math.max(1,total)))+' %...';
   if(behind>0)setTimeout(chunk,0);else start()})();
 }).catch(e=>{
