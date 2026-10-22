@@ -183,7 +183,7 @@ function start(){
  const c=iso(GW/2,GH/2,1);cam.x=c[0];cam.y=c[1];cam.z=clamp(W/1400,.4,.9);
  requestAnimationFrame(t=>{last=t;loop(t)})}
 fetch(STATE_URL+'?'+Date.now()).then(r=>{if(!r.ok)throw 0;return r.json()}).then(j=>{
- Sim.load(j.state);savedAt=j.meta.savedAt||Date.now();
+ if(!j.state||j.state.v!==3)throw 0;Sim.load(j.state);savedAt=j.meta.savedAt||Date.now();
  const behind=Math.min(1800,Math.max(0,(Date.now()-savedAt)/1000));
  $('clock').textContent='Henter inn '+Math.round(behind)+' s...';
  setTimeout(()=>{Sim.advance(behind);start()},30);

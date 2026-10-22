@@ -5,11 +5,12 @@ const require = createRequire(import.meta.url);
 const Sim = require('./sim.js');
 import { consult } from './council.mjs';
 const FILE = 'state.json';
-const MAX_CATCHUP = 3 * 3600; // never simulate more than three hours in one run
+const MAX_CATCHUP = 6 * 3600; // never simulate more than six hours in one run
 const now = Date.now();
 let meta;
-if (fs.existsSync(FILE)) {
-  const raw = JSON.parse(fs.readFileSync(FILE, 'utf8'));
+let raw = null;
+if (fs.existsSync(FILE)) { raw = JSON.parse(fs.readFileSync(FILE, 'utf8')); if (!raw.state || raw.state.v !== 3) { console.log('Old world format, starting a new one'); raw = null; } }
+if (raw) {
   meta = raw.meta || {};
   Sim.load(raw.state);
   const elapsed = Math.min(MAX_CATCHUP, Math.max(0, (now - (meta.savedAt || now)) / 1000));

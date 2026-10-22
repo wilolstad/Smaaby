@@ -4,7 +4,7 @@
   else root.Sim = factory();
 })(typeof self !== 'undefined' ? self : this, function () {
   'use strict';
-  const GW = 80, GH = 80, DAYLEN = 600, DT = 0.5;
+  const GW = 112, GH = 112, DAYLEN = 600, DT = 0.5;
   const NB4 = [[0, -1], [1, 0], [0, 1], [-1, 0]];
   const NAMES = ['Mira', 'Ola', 'Siv', 'Jon', 'Eli', 'Per', 'Kari', 'Nils', 'Tuva', 'Lars', 'Ida', 'Odd', 'Maja', 'Eirik', 'Sunniva', 'Håkon', 'Live', 'Tor', 'Aud', 'Sander', 'Frida', 'Knut', 'Ragna', 'Even', 'Silje', 'Arne', 'Hedda', 'Stian', 'Vilde', 'Bjørn', 'Thea', 'Gunnar', 'Ingrid', 'Magnus', 'Nora', 'Rune', 'Selma', 'Yngve', 'Åse', 'Trym'];
   const DEF = {
@@ -44,7 +44,7 @@
   const techInfo = (k) => TECHS[k] || (S.invInfo && S.invInfo[k]);
   function eff(k) {
     let s = 0;
-    for (const key in S.inv) { const i = S.invInfo[key]; if (i && i.effect && i.effect.type === k) s += i.effect.value * (S.defs[key] ? Math.min(3, S.blds.filter((id) => S.objs[id] && S.objs[id].type === key).length) : 1); }
+    for (const key in S.inv) { const i = S.invInfo[key]; if (i && i.effect && i.effect.type === k) s += i.effect.value * (S.defs[key] ? Math.min(6, S.blds.filter((id) => S.objs[id] && S.objs[id].type === key).length) : 1); }
     return 1 + s;
   }
 
@@ -81,9 +81,9 @@
   function genWorld() {
     const L1 = lat(9), L2 = lat(18), L3 = lat(14);
     const cx = GW / 2, cy = GH / 2, blobs = [[cx, cy, 15]];
-    const ang0 = R() * 6.28, count = 4;
+    const ang0 = R() * 6.28, count = 8;
     for (let i = 0; i < count; i++) {
-      const a = ang0 + (i / count) * 6.28 + (R() - 0.5) * 0.5, dist = 23 + R() * 6, r = 6 + R() * 3.5;
+      const a = ang0 + (i / count) * 6.28 + (R() - 0.5) * 0.5, dist = 22 + R() * 22, r = 5 + R() * 5;
       blobs.push([cx + Math.cos(a) * dist, cy + Math.sin(a) * dist, r]);
     }
     S.grid = [];
@@ -121,7 +121,7 @@
 
   // ---------- init / (de)serialise
   function create(seed) {
-    S = { v: 2, rs: seed | 0 || 1234567, time: 0, nid: 0, objs: {}, grid: [], vill: [], sites: [], blds: [], storages: [], res: { wood: 14, stone: 3, food: 12 }, log: [], tech: { done: {}, cur: null, prog: 0 }, islands: 1, vid: 0, growT: 0, eatT: 0, planT: 0, thinkT: 0, lastDay: -1, nightLogged: false, expandT: 0, ev: null, defs: {}, inv: {}, invInfo: {}, invq: [], thoughts: {}, goal: null, nInv: 0, scanT: 0, reach: null, stats: { built: 0, born: 0 } };
+    S = { v: 3, rs: seed | 0 || 1234567, time: 0, nid: 0, objs: {}, grid: [], vill: [], sites: [], blds: [], storages: [], res: { wood: 14, stone: 3, food: 12 }, log: [], tech: { done: {}, cur: null, prog: 0 }, islands: 1, vid: 0, growT: 0, eatT: 0, planT: 0, thinkT: 0, lastDay: -1, nightLogged: false, expandT: 0, ev: null, defs: {}, inv: {}, invInfo: {}, invq: [], thoughts: {}, goal: null, nInv: 0, scanT: 0, reach: null, stats: { built: 0, born: 0 } };
     genWorld();
     const cx = GW >> 1, cy = GH >> 1;
     const fire = newObj({ type: 'fire', storage: true, x: cx, y: cy, size: 1 }); setObj(cx, cy, fire); S.storages.push(fire.id);
@@ -205,7 +205,7 @@
 
   // ---------- pathfinding
   function bfs(sx, sy, goal, limit) {
-    limit = limit || 4200;
+    limit = limit || 9000;
     const prev = new Int16Array(GW * GH).fill(-2), q = [sy * GW + sx];
     prev[q[0]] = -1; let found = null, fi = -1;
     for (let qi = 0; qi < q.length && qi < limit; qi++) {
@@ -228,19 +228,16 @@
     const h = count('house'), f = count('farm'), p = S.vill.length, c = cap();
     if (h < 1) return 'house';
     if (f < 1) return 'farm';
-    if (p >= c - 1 && h < 40) return 'house';
-    if (f < Math.ceil(p / 4) && f < 12) return 'farm';
-    if (count('well') < 1 && h >= 3) return 'well';
-    if (count('library') < 1 && h >= 4) return 'library';
-    if (count('store') < 1 && h >= 4) return 'store';
-    if (count('tower') < 1 && h >= 6) return 'tower';
-    if (count('plaza') < 1 && h >= 8) return 'plaza';
-    if (hasTech('windmill') && count('mill') < Math.min(3, Math.floor(f / 3))) return 'mill';
-    if (p >= 8) for (const k in S.defs) if (count(k) < S.defs[k].max && h >= 5) return k;
-    if (count('well') < 2 && h >= 10) return 'well';
-    if (count('store') < 2 && h >= 12) return 'store';
-    if (count('well') < 3 && h >= 18) return 'well';
-    return h < 40 ? 'house' : 'farm';
+    if (p >= c - 1) return 'house';
+    if (f < Math.ceil(p / 4)) return 'farm';
+    if (count('well') < Math.max(1, Math.ceil(h / 8)) && h >= 3) return 'well';
+    if (count('library') < Math.max(1, Math.ceil(h / 12)) && h >= 4) return 'library';
+    if (count('store') < Math.max(1, Math.ceil(h / 10)) && h >= 4) return 'store';
+    if (count('tower') < Math.max(1, Math.ceil(h / 14)) && h >= 6) return 'tower';
+    if (count('plaza') < Math.max(1, Math.ceil(h / 16)) && h >= 8) return 'plaza';
+    if (hasTech('windmill') && count('mill') < Math.floor(f / 3)) return 'mill';
+    if (p >= 8) for (const k in S.defs) if (count(k) < Math.max(S.defs[k].max, Math.ceil(h / 6)) && h >= 5) return k;
+    return 'house';
   }
   function center() {
     let sx = GW / 2, sy = GH / 2, n = 1;
@@ -361,11 +358,11 @@
     if (!p || typeof p !== 'object') return null;
     const str = (x, n) => String(x == null ? '' : x).replace(/[<>]/g, '').slice(0, n).trim();
     const e = p.effect || {}; if (!EFFECTS[e.type]) return null;
-    const out = { n: str(p.name || p.n, 28), d: str(p.description || p.d || EFFECTS[e.type], 90), effect: { type: e.type, value: clamp(Number(e.value) || 0.08, 0.04, 0.2) }, src: str(p.src || 'rådet', 20) };
+    const out = { n: str(p.name || p.n, 28), d: str(p.description || p.d || EFFECTS[e.type], 90), effect: { type: e.type, value: clamp(Number(e.value) || 0.08, 0.04, 0.5) }, src: str(p.src || 'rådet', 20) };
     if (!out.n) return null;
     if (p.building && typeof p.building === 'object') {
       const b = p.building, c = b.cost || {}, col = Array.isArray(b.color) ? b.color : [150, 150, 150];
-      out.bld = { n: str(b.name, 24) || out.n + 'hus', cost: { wood: clamp(Math.round(Number(c.wood) || 10), 0, 40), stone: clamp(Math.round(Number(c.stone) || 6), 0, 40) }, color: [0, 1, 2].map((i) => clamp(Math.round(Number(col[i]) || 150), 40, 235)), height: clamp(Number(b.height) || 2.5, 1, 5), roof: ROOFS.includes(b.roof) ? b.roof : 'pointed', max: 3 };
+      out.bld = { n: str(b.name, 24) || out.n + 'hus', cost: { wood: clamp(Math.round(Number(c.wood) || 10), 0, 120), stone: clamp(Math.round(Number(c.stone) || 6), 0, 120) }, color: [0, 1, 2].map((i) => clamp(Math.round(Number(col[i]) || 150), 40, 235)), height: clamp(Number(b.height) || 2.5, 1, 8), roof: ROOFS.includes(b.roof) ? b.roof : 'pointed', max: 6 };
     }
     return out;
   }
@@ -555,6 +552,50 @@
     }
   }
 
+  // ---------- catastrophes, death and new land
+  function die(v, why) {
+    release(v); S.vill = S.vill.filter((x) => x !== v);
+    if (!S.deaths) S.deaths = 0; S.deaths++;
+    if (S.vill.length < 4 || S.deaths % 5 === 1) log(v.name + ' ' + why + '.');
+    ev('puff', v.x, v.y, v.z + 1, { n: 3 });
+  }
+  function destroyBld(b) {
+    S.blds = S.blds.filter((id) => id !== b.id); S.storages = S.storages.filter((id) => id !== b.id); S.sites = S.sites.filter((id) => id !== b.id);
+    for (const v of S.vill) if (v.task && v.task.bld === b.id) { v.hidden = false; v.sleeping = false; v.task = null; v.state = 'idle'; v.path = []; }
+    ev('puff', b.x + 0.5, b.y + 0.5, 1.5, { n: 8 }); dropObj(b);
+  }
+  function fire() {
+    const bl = S.blds.map(T).filter((b) => b && b.type !== 'fire'); if (bl.length < 5) return;
+    const c = bl[Math.floor(R() * bl.length)]; let lost = 0;
+    for (const b of bl) if (Math.hypot(b.x - c.x, b.y - c.y) <= 3.5 && R() < 0.75) { destroyBld(b); lost++; }
+    for (const k in S.objs) { const o = S.objs[k]; if (o.type === 'tree') { /* trees burn near the fire */ } }
+    for (let y = Math.floor(c.y) - 4; y <= c.y + 4; y++) for (let x = Math.floor(c.x) - 4; x <= c.x + 4; x++) { const g = G(x, y), o = OB(g); if (o && o.type === 'tree' && Math.hypot(x - c.x, y - c.y) < 4.2) dropObj(o); }
+    log('Brann! ' + lost + ' bygg brant ned.');
+  }
+  function flood() {
+    const coast = []; for (let y = 1; y < GH - 1; y++) for (let x = 1; x < GW - 1; x++) { const g = G(x, y); if (S.reach[y * GW + x] && g.k !== 'water' && NB4.some(([dx, dy]) => G(x + dx, y + dy).k === 'water')) coast.push([x, y]); }
+    if (!coast.length) return;
+    const [cx, cy] = coast[Math.floor(R() * coast.length)], r = 3 + R() * 3; let n = 0, lost = 0;
+    for (let y = Math.floor(cy - r); y <= cy + r; y++) for (let x = Math.floor(cx - r); x <= cx + r; x++) {
+      const g = G(x, y); if (!g || g.k === 'water' || Math.hypot(x - cx, y - cy) > r || g.h > 1) continue;
+      const o = OB(g); if (o) { if (S.blds.includes(o.id) || o.type === 'site') { destroyBld(o); lost++; } else dropObj(o); }
+      g.k = 'water'; g.h = 0; g.d = 0; n++;
+    }
+    scan(); log('Havet stiger! ' + n + ' ruter ble til sjø' + (lost ? ' og ' + lost + ' bygg gikk tapt' : '') + '.');
+  }
+  function riseIsland() {
+    for (let tries = 0; tries < 40; tries++) {
+      const cx = 8 + Math.floor(R() * (GW - 16)), cy = 8 + Math.floor(R() * (GH - 16)), r = 3 + R() * 4; let clear = true;
+      for (let y = cy - 9; y <= cy + 9 && clear; y++) for (let x = cx - 9; x <= cx + 9; x++) { const g = G(x, y); if (!g || g.k !== 'water') { clear = false; break; } }
+      if (!clear) continue;
+      for (let y = Math.floor(cy - r - 1); y <= cy + r + 1; y++) for (let x = Math.floor(cx - r - 1); x <= cx + r + 1; x++) {
+        const d = Math.hypot(x - cx, y - cy) + (R() - 0.5) * 1.6; if (d > r) continue;
+        const g = G(x, y); g.k = d > r - 1.2 ? 'sand' : 'grass'; g.h = d < r * 0.35 && R() < 0.6 ? 2 : 1; g.o = 0;
+        if (g.k === 'grass') { if (R() < 0.35) setObj(x, y, newObj({ type: 'tree', claimed: 0, v: R(), born: -9999 })); else if (R() < 0.08) setObj(x, y, newObj({ type: 'rock', amt: 2, claimed: 0 })); }
+      }
+      log('Det stiger en ny øy opp av havet!'); ev('spark', cx + 0.5, cy + 0.5, 3, {}); return;
+    }
+  }
   // ---------- main step
   function step(dt) {
     S.time += dt;
@@ -581,12 +622,18 @@
     S.planT -= dt; if (S.planT <= 0) { S.planT = 2; planner(); }
     S.scanT -= dt; if (S.scanT <= 0) { S.scanT = hasTech('cartog') ? 10 : 20; scan(); }
     S.growT += dt;
-    if (S.growT >= (hasTech('harvest') ? 30 : 45)) { S.growT = 0; if (S.res.food >= 8 && S.vill.length < cap() && S.vill.length < 140) { const f = T(S.storages[0]); addVillager(f.x, f.y + 2); if (S.vill.length % 5 === 0) log('Landsbyen har nå ' + S.vill.length + ' innbyggere.'); } }
+    if (S.growT >= (hasTech('harvest') ? 30 : 45)) { S.growT = 0; if (S.res.food >= 8 && S.vill.length < cap() && S.vill.length < 600) { const f = T(S.storages[0]); addVillager(f.x, f.y + 2); if (S.vill.length % 5 === 0) log('Landsbyen har nå ' + S.vill.length + ' innbyggere.'); } }
     S.eatT += dt;
     if (S.eatT >= 60) {
       S.eatT = 0; S.res.food = Math.max(0, S.res.food - Math.ceil(S.vill.length * (hasTech('medicine') ? 0.45 : 0.6) / eff('food_save')));
-      if (S.res.food <= 0 && S.hungerDay !== S.lastDay) { S.hungerDay = S.lastDay; log('Det er tomt for mat.'); }
+      if (S.res.food <= 0) { if (S.hungerDay !== S.lastDay) { S.hungerDay = S.lastDay; log('Det er tomt for mat. Folk sulter.'); } const n = Math.max(1, Math.floor(S.vill.length * 0.08)); for (let i = 0; i < n && S.vill.length > 2; i++) die(S.vill[Math.floor(R() * S.vill.length)], 'sultet i hjel'); }
     }
+    S.disT = (S.disT === undefined ? 1500 : S.disT) - dt;
+    if (S.disT <= 0) { S.disT = 600 + R() * 1400; if (R() < 0.5) fire(); else flood(); }
+    S.riseT = (S.riseT === undefined ? 2400 : S.riseT) - dt;
+    if (S.riseT <= 0) { S.riseT = 2400 + R() * 3600; riseIsland(); }
+    S.drownT = (S.drownT || 0) - dt;
+    if (S.drownT <= 0) { S.drownT = 3; for (const v of S.vill.slice()) { const g = G(Math.floor(v.x), Math.floor(v.y)); if (g && g.k === 'water') die(v, 'druknet'); } }
     for (const v of S.vill) { v.age += dt; updateV(v, dt); }
     if (S.ev && S.ev.length > 200) S.ev.length = 200;
   }
