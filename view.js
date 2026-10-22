@@ -152,11 +152,14 @@ function hud(){
  renderLog();
 }
 function thoughtOf(v){const r=S.res;if(v.sleeping)return 'Zzz...';if(r.food<20)return 'Vi må skaffe mer mat.';if(r.stone<5)return 'Vi trenger stein.';if(r.wood<10)return 'Det blir lite tre igjen.';const top=Object.entries(v.w).sort((a,b)=>b[1]-a[1])[0][0];return ({build:'Jeg elsker å bygge.',study:'Jeg vil forstå mer.',tree:'Skogen kaller på meg.',rock:'Stein er min greie.',bush:'Jeg liker å sanke.',farm:'Åkeren trenger meg.'})[top]}
+const save=x=>{try{localStorage.setItem('smaaby.speed',String(x))}catch(e){}};
+const load=()=>{try{return localStorage.getItem('smaaby.speed')}catch(e){return null}};
 const ctl=$('ctl');
 const mk=(t,fn,tog,id)=>{const b=document.createElement('button');b.type='button';b.textContent=t;if(id)b.dataset.id=id;if(tog)b.setAttribute('aria-pressed',false);b.onclick=()=>fn(b);ctl.appendChild(b);return b};
-mk('Live',b=>{speed=scale;ctl.querySelectorAll('[data-id^=sp]').forEach(x=>x.setAttribute('aria-pressed',x===b))},true,'splive');
-[1,4,16,64].forEach(s=>mk(s+'×',b=>{speed=s;ctl.querySelectorAll('[data-id^=sp]').forEach(x=>x.setAttribute('aria-pressed',x===b))},true,'sp'+s));
+mk('Live',b=>{speed=scale;save('live');ctl.querySelectorAll('[data-id^=sp]').forEach(x=>x.setAttribute('aria-pressed',x===b))},true,'splive');
+[1,4,16,64].forEach(s=>mk(s+'×',b=>{speed=s;save(s);ctl.querySelectorAll('[data-id^=sp]').forEach(x=>x.setAttribute('aria-pressed',x===b))},true,'sp'+s));
 ctl.querySelector('[data-id=splive]').setAttribute('aria-pressed',true);
+function restoreSpeed(){const s=load();if(!s||s==='live')return;const n=Number(s);const b=ctl.querySelector('[data-id=sp'+n+']');if(b){speed=n;ctl.querySelectorAll('[data-id^=sp]').forEach(x=>x.setAttribute('aria-pressed',x===b))}}
 mk('Pause',b=>{paused=!paused;b.textContent=paused?'Spill':'Pause';b.setAttribute('aria-pressed',paused)},true);
 const ab=mk('Auto-kamera',b=>{auto=!auto;b.setAttribute('aria-pressed',auto)},true);ab.setAttribute('aria-pressed',true);
 mk('+',()=>cam.z=clamp(cam.z*1.2,.3,2.4));mk('−',()=>cam.z=clamp(cam.z/1.2,.3,2.4));
@@ -184,7 +187,7 @@ function start(){
  requestAnimationFrame(t=>{last=t;loop(t)})}
 fetch(STATE_URL+'?'+Date.now()).then(r=>{if(!r.ok)throw 0;return r.json()}).then(j=>{
  if(!j.state||j.state.v!==3)throw 0;Sim.load(j.state);savedAt=j.meta.savedAt||Date.now();
- scale=j.meta.scale||1;speed=scale;
+ scale=j.meta.scale||1;speed=scale;restoreSpeed();
  let behind=Math.min(3600,Math.max(0,(Date.now()-savedAt)/1000*scale));
  const total=behind;
  (function chunk(){const t0=performance.now();while(behind>0&&performance.now()-t0<14){Sim.step(.5);behind-=.5}
