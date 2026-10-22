@@ -6,6 +6,7 @@ const Sim = require('./sim.js');
 import { consult } from './council.mjs';
 const FILE = 'state.json';
 const MAX_CATCHUP = 6 * 3600; // never simulate more than six hours in one run
+const SCALE = Number(process.env.TIMESCALE) || 32; // village seconds per real second
 const now = Date.now();
 let meta;
 let raw = null;
@@ -13,7 +14,7 @@ if (fs.existsSync(FILE)) { raw = JSON.parse(fs.readFileSync(FILE, 'utf8')); if (
 if (raw) {
   meta = raw.meta || {};
   Sim.load(raw.state);
-  const elapsed = Math.min(MAX_CATCHUP, Math.max(0, (now - (meta.savedAt || now)) / 1000));
+  const elapsed = Math.min(MAX_CATCHUP, Math.max(0, ((now - (meta.savedAt || now)) / 1000) * SCALE));
   console.log(`Fast-forwarding ${elapsed.toFixed(0)} s of village life`);
   Sim.advance(elapsed);
   try {
@@ -29,6 +30,7 @@ if (raw) {
   console.log('A new island is born');
 }
 meta.savedAt = now;
+meta.scale = SCALE;
 meta.bornAt = meta.bornAt || now;
 fs.writeFileSync(FILE, JSON.stringify({ meta, state: Sim.S }));
 const S = Sim.S;
