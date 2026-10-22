@@ -5,6 +5,7 @@ on:
   workflow_dispatch:
 permissions:
   contents: write
+  models: read
 concurrency:
   group: smaaby-tick
   cancel-in-progress: false
@@ -20,6 +21,8 @@ jobs:
         run: git fetch origin state --depth=1 && git show FETCH_HEAD:state.json > state.json || echo "no previous state"
       - name: Advance the village
         run: node tick.mjs
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
       - name: Publish state (single force-pushed commit, no history bloat)
         run: |
           mkdir ../out && cp state.json ../out/

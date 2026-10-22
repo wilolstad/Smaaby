@@ -36,7 +36,17 @@
     guild: { n: 'Laug', cost: 1000, req: ['timber', 'quarry'], d: 'Byggere jobber 40 % raskere' },
     harvest: { n: 'Høstfest', cost: 1300, req: ['guild', 'medicine'], d: 'Landsbyen vokser raskere' }
   };
+  for (const k in TECHS) TECHS[k].cost = Math.round(TECHS[k].cost * 2.5);
+  const EFFECTS = { farm_growth: 'Åkrene gror raskere', work_speed: 'Alt arbeid går raskere', carry: 'Bærer mer per tur', walk: 'Går raskere', research: 'Forskning går raskere', build: 'Bygger raskere', food_save: 'Mindre matsvinn', pop_cap: 'Plass til flere innbyggere' };
+  const ROOFS = ['flat', 'pointed', 'dome', 'none'];
   let S = null;
+  const defOf = (t) => DEF[t] || (S && S.defs && S.defs[t]);
+  const techInfo = (k) => TECHS[k] || (S.invInfo && S.invInfo[k]);
+  function eff(k) {
+    let s = 0;
+    for (const key in S.inv) { const i = S.invInfo[key]; if (i && i.effect && i.effect.type === k) s += i.effect.value * (S.defs[key] ? Math.min(3, S.blds.filter((id) => S.objs[id] && S.objs[id].type === key).length) : 1); }
+    return 1 + s;
+  }
 
   // ---------- deterministic rng stored in state
   function R() {
@@ -111,7 +121,7 @@
 
   // ---------- init / (de)serialise
   function create(seed) {
-    S = { v: 2, rs: seed | 0 || 1234567, time: 0, nid: 0, objs: {}, grid: [], vill: [], sites: [], blds: [], storages: [], res: { wood: 14, stone: 3, food: 12 }, log: [], tech: { done: {}, cur: null, prog: 0 }, islands: 1, vid: 0, growT: 0, eatT: 0, planT: 0, thinkT: 0, lastDay: -1, nightLogged: false, expandT: 0, ev: null, scanT: 0, reach: null, stats: { built: 0, born: 0 } };
+    S = { v: 2, rs: seed | 0 || 1234567, time: 0, nid: 0, objs: {}, grid: [], vill: [], sites: [], blds: [], storages: [], res: { wood: 14, stone: 3, food: 12 }, log: [], tech: { done: {}, cur: null, prog: 0 }, islands: 1, vid: 0, growT: 0, eatT: 0, planT: 0, thinkT: 0, lastDay: -1, nightLogged: false, expandT: 0, ev: null, defs: {}, inv: {}, invInfo: {}, invq: [], thoughts: {}, goal: null, nInv: 0, scanT: 0, reach: null, stats: { built: 0, born: 0 } };
     genWorld();
     const cx = GW >> 1, cy = GH >> 1;
     const fire = newObj({ type: 'fire', storage: true, x: cx, y: cy, size: 1 }); setObj(cx, cy, fire); S.storages.push(fire.id);
@@ -136,6 +146,12 @@
     const all = ['flittig', 'nysgjerrig', 'rolig', 'modig', 'sosial', 'tankefull'];
     return all[Math.floor(R() * all.length)];
   }
+  function brainFor() {
+    const w = { build: 0.8 + R() * 0.4, study: 0.8 + R() * 0.4, tree: 0.8 + R() * 0.4, rock: 0.8 + R() * 0.4, bush: 0.8 + R() * 0.4, farm: 0.8 + R() * 0.4 };
+    if (S.vill && S.vill.length > 1) { const a = S.vill[Math.floor(R() * S.vill.length)], b = S.vill[Math.floor(R() * S.vill.length)]; if (a.w && b.w) for (const k in w) w[k] = clamp((a.w[k] + b.w[k]) / 2 + (R() - 0.5) * 0.2, 0.5, 2.2); }
+    return w;
+  }
+  function learn(v, k) { if (!v.w) return; v.w[k] = clamp(v.w[k] + 0.025, 0.5, 2.2); for (const j in v.w) v.w[j] += (1 - v.w[j]) * 0.008; }
   function addVillager(x, y, silent) {
     const used = new Set(S.vill.map((v) => v.name));
     const free = NAMES.filter((n) => !used.has(n));
@@ -144,7 +160,7 @@
     const v = {
       id: ++S.vid, name, x: x + 0.5, y: y + 0.5, z: 1, path: [], state: 'idle', task: null, timer: 0, carry: null, role: 'idle', hidden: false, sleeping: false, face: 1, bob: R() * 6, idle: R() * 2,
       speed: 1.9 + R() * 0.6, trait, dil: trait === 'flittig' ? 1.15 : trait === 'rolig' ? 0.92 : 1, cur: trait === 'nysgjerrig' ? 0.95 : trait === 'tankefull' ? 0.8 : 0.3 + R() * 0.3,
-      sk: { wood: 0, stone: 0, food: 0, build: 0, study: 0 }, age: 0,
+      sk: { wood: 0, stone: 0, food: 0, build: 0, study: 0 }, age: 0, w: brainFor(),
       hair: [[60, 40, 28], [200, 150, 70], [30, 24, 24], [150, 70, 40], [210, 200, 190]][Math.floor(R() * 5)],
       skin: [[241, 194, 160], [224, 170, 130], [190, 134, 98], [150, 100, 70]][Math.floor(R() * 4)]
     };
@@ -160,9 +176,9 @@
   const lightAt = (p) => (p < 0.55 ? 1 : p < 0.7 ? 1 - (p - 0.55) / 0.15 : p < 0.92 ? 0 : (p - 0.92) / 0.08);
   const light = () => lightAt(phase());
   const sleepLight = () => (hasTech('lantern') ? 0.16 : 0.3);
-  const cap = () => 4 + houses() * (hasTech('masonry') ? 3 : 2);
+  const cap = () => Math.floor((4 + houses() * (hasTech('masonry') ? 3 : 2)) * eff('pop_cap'));
   const cost = (type) => {
-    const base = Object.assign({}, DEF[type].cost); if (type === 'house' && hasTech('timber')) { base.wood = 10; delete base.stone; }
+    const base = Object.assign({}, defOf(type).cost); if (type === 'house' && hasTech('timber')) { base.wood = 10; delete base.stone; }
     const n = Math.max(0, count(type) - 2), f = type === 'landfill' || type === 'bridge' ? 1 : 1 + n * 0.08, out = {};
     for (const k in base) out[k] = Math.ceil(base[k] * f);
     return out;
@@ -220,6 +236,7 @@
     if (count('tower') < 1 && h >= 6) return 'tower';
     if (count('plaza') < 1 && h >= 8) return 'plaza';
     if (hasTech('windmill') && count('mill') < Math.min(3, Math.floor(f / 3))) return 'mill';
+    if (p >= 8) for (const k in S.defs) if (count(k) < S.defs[k].max && h >= 5) return k;
     if (count('well') < 2 && h >= 10) return 'well';
     if (count('store') < 2 && h >= 12) return 'store';
     if (count('well') < 3 && h >= 18) return 'well';
@@ -241,7 +258,7 @@
     return true;
   }
   function findSpot(type) {
-    const sz = DEF[type].size, [cx, cy] = center(), c = [];
+    const sz = defOf(type).size, [cx, cy] = center(), c = [];
     const maxR = 12 + Math.sqrt(S.blds.length) * 3;
     for (let y = 2; y < GH - 3; y++) for (let x = 2; x < GW - 3; x++) {
       const d = Math.hypot(x - cx, y - cy); if (d < 2.2 || d > maxR) continue;
@@ -252,7 +269,7 @@
     return null;
   }
   function makeSite(type, x, y) {
-    const d = DEF[type], c = cost(type);
+    const d = defOf(type), c = cost(type);
     for (const k in c) S.res[k] -= c[k];
     const site = newObj({ type: 'site', what: type, x, y, size: d.size, prog: 0, time: d.time, builders: 0, maxB: type === 'tower' ? 3 : 2, done: false });
     for (let j = 0; j < d.size; j++) for (let i = 0; i < d.size; i++) setObj(x + i, y + j, site);
@@ -266,7 +283,7 @@
     const t = nextType();
     if (afford(cost(t))) {
       const sp = findSpot(t);
-      if (sp) { makeSite(t, sp[0], sp[1]); log('Byggeplass: ' + DEF[t].n.toLowerCase() + '.'); return; }
+      if (sp) { makeSite(t, sp[0], sp[1]); log('Byggeplass: ' + defOf(t).n.toLowerCase() + '.'); return; }
       S.noSpot = (S.noSpot || 0) + 1;
     }
     maybeExpand();
@@ -322,25 +339,67 @@
     delete S.objs[s.id];
     if (s.what === 'store') S.storages.push(b.id);
     S.blds.push(b.id); S.stats.built++;
-    log(DEF[s.what].n + ' er ferdig.');
+    log(defOf(s.what).n + ' er ferdig.');
     ev('puff', s.x + 0.5, s.y + 0.5, 1.5, { n: 10 });
   }
 
   // ---------- research
   function availableTechs() { return Object.keys(TECHS).filter((k) => !S.tech.done[k] && TECHS[k].req.every((r) => S.tech.done[r])); }
+  const SUBJ = ['Fiskeredskap', 'Saltlake', 'Vevstol', 'Kompass', 'Tørkestativ', 'Vannhjul', 'Smie', 'Lysestøperi', 'Tauverk', 'Frøbank', 'Kalender', 'Skriftruller', 'Mosaikk', 'Trommespråk', 'Brenneovn', 'Kartpress', 'Skipsdokk', 'Hagebruk', 'Biavl', 'Glassblåsing', 'Gjæringskunst', 'Nattvakt', 'Teater', 'Observatorium'];
+  const RN = ['', ' II', ' III', ' IV', ' V', ' VI', ' VII', ' VIII', ' IX', ' X'];
+  function procInvention() {
+    const used = new Set(Object.values(S.invInfo).map((i) => i.n));
+    let name = null;
+    for (let r = 0; r < RN.length && !name; r++) { const fr = SUBJ.filter((x) => !used.has(x + RN[r])); if (fr.length) name = fr[Math.floor(R() * fr.length)] + RN[r]; }
+    if (!name) name = 'Mysterium ' + (S.nInv + 1);
+    const types = Object.keys(EFFECTS), type = types[Math.floor(R() * types.length)], value = Math.round((0.06 + R() * 0.1) * 100) / 100;
+    const p = { n: name, d: EFFECTS[type] + ' (+' + Math.round(value * 100) + ' %)', effect: { type, value }, src: 'folkets egne idéer' };
+    if (R() < 0.4) p.bld = { n: name.replace(/ [IVX]+$/, '') + 'hus', cost: { wood: 10 + Math.floor(R() * 10), stone: 4 + Math.floor(R() * 10) }, color: [80 + Math.floor(R() * 150), 80 + Math.floor(R() * 130), 80 + Math.floor(R() * 150)], height: 1.5 + Math.floor(R() * 3), roof: ROOFS[Math.floor(R() * 3)], max: 3 };
+    return p;
+  }
+  function sanitize(p) {
+    if (!p || typeof p !== 'object') return null;
+    const str = (x, n) => String(x == null ? '' : x).replace(/[<>]/g, '').slice(0, n).trim();
+    const e = p.effect || {}; if (!EFFECTS[e.type]) return null;
+    const out = { n: str(p.name || p.n, 28), d: str(p.description || p.d || EFFECTS[e.type], 90), effect: { type: e.type, value: clamp(Number(e.value) || 0.08, 0.04, 0.2) }, src: str(p.src || 'rådet', 20) };
+    if (!out.n) return null;
+    if (p.building && typeof p.building === 'object') {
+      const b = p.building, c = b.cost || {}, col = Array.isArray(b.color) ? b.color : [150, 150, 150];
+      out.bld = { n: str(b.name, 24) || out.n + 'hus', cost: { wood: clamp(Math.round(Number(c.wood) || 10), 0, 40), stone: clamp(Math.round(Number(c.stone) || 6), 0, 40) }, color: [0, 1, 2].map((i) => clamp(Math.round(Number(col[i]) || 150), 40, 235)), height: clamp(Number(b.height) || 2.5, 1, 5), roof: ROOFS.includes(b.roof) ? b.roof : 'pointed', max: 3 };
+    }
+    return out;
+  }
   function chooseResearch() {
-    const a = availableTechs(); if (!a.length) { S.tech.cur = null; return; }
-    S.tech.cur = a[Math.floor(R() * a.length)]; S.tech.prog = Math.min(S.tech.prog, 0.5 * TECHS[S.tech.cur].cost);
+    const a = availableTechs();
+    if (a.length && (!S.invq.length || R() < 0.5)) { S.tech.cur = a[Math.floor(R() * a.length)]; S.tech.prog = Math.min(S.tech.prog, 0.5 * TECHS[S.tech.cur].cost); return; }
+    const p = S.invq.length ? S.invq.shift() : procInvention();
+    const key = 'i' + (++S.nInv);
+    S.invInfo[key] = Object.assign({}, p, { cost: Math.round(1500 + S.nInv * 220) });
+    S.tech.cur = key; S.tech.prog = Math.min(S.tech.prog, 0.3 * S.invInfo[key].cost);
   }
   function addKnowledge(v, amt) {
     if (!S.tech.cur) return;
-    S.tech.prog += amt;
-    if (S.tech.prog >= TECHS[S.tech.cur].cost) {
-      const k = S.tech.cur; S.tech.done[k] = S.time; S.tech.prog -= TECHS[k].cost;
-      log(v.name + ' oppfant ' + TECHS[k].n.toLowerCase() + '! ' + TECHS[k].d + '.');
+    S.tech.prog += amt * eff('research');
+    const k = S.tech.cur, info = techInfo(k);
+    if (S.tech.prog >= info.cost) {
+      S.tech.prog -= info.cost;
+      if (TECHS[k]) S.tech.done[k] = S.time; else { S.inv[k] = S.time; if (info.bld) S.defs[k] = { n: info.bld.n, cost: info.bld.cost, time: 24, size: 1, shape: info.bld, max: info.bld.max || 3 }; }
+      log(v.name + ' oppfant ' + info.n.toLowerCase() + '! ' + info.d + '.' + (!TECHS[k] && info.bld ? ' Kan nå bygge ' + info.bld.n.toLowerCase() + '.' : ''));
       ev('spark', v.x, v.y, v.z + 3, {});
       chooseResearch();
     }
+  }
+  function applyCouncil(r) {
+    if (!r || typeof r !== 'object') return 0;
+    let n = 0;
+    for (const p of (Array.isArray(r.inventions) ? r.inventions : []).slice(0, 3)) { const q = sanitize(Object.assign({}, p, { src: 'rådet' })); if (q && S.invq.length < 4) { S.invq.push(q); n++; } }
+    if (typeof r.goal === 'string') { S.goal = r.goal.replace(/[<>]/g, '').slice(0, 120); log('Rådet: ' + S.goal); }
+    if (Array.isArray(r.thoughts)) for (const t of r.thoughts.slice(0, 8)) if (t && t.name && t.text) S.thoughts[String(t.name).slice(0, 20)] = { text: String(t.text).replace(/[<>]/g, '').slice(0, 140), at: S.time };
+    return n;
+  }
+  function summary() {
+    const cnt = {}; for (const id of S.blds) { const b = S.objs[id]; if (b) cnt[b.type] = (cnt[b.type] || 0) + 1; }
+    return { dag: Math.floor(S.time / DAYLEN) + 1, innbyggere: S.vill.length, ressurser: S.res, bygninger: cnt, oyer: S.islands, funnet: Object.keys(S.tech.done).map((k) => TECHS[k].n).concat(Object.keys(S.inv).map((k) => S.invInfo[k].n)), forsker_pa: S.tech.cur ? techInfo(S.tech.cur).n : null, ko: S.invq.map((q) => q.n), navn: S.vill.slice(0, 12).map((v) => v.name + ' (' + v.trait + ')'), siste_hendelser: S.log.slice(-8).map((l) => l.text), tillatte_effekter: EFFECTS };
   }
 
   // ---------- villager AI
@@ -397,16 +456,16 @@
   }
   function think(v) {
     if (light() < sleepLight()) { if (trySleep(v)) return; v.idle = 2; return; }
-    const nt = nextType(), need = DEF[nt].cost, pop = S.vill.length;
+    const nt = nextType(), need = defOf(nt).cost, pop = S.vill.length;
     const want = { wood: (need.wood || 0) + 10, stone: (need.stone || 0) + 6, food: pop * 3 + 10 };
     const opts = [];
-    if (openSites().some((id) => T(id).builders < T(id).maxB)) opts.push(['build', 2.2 + lvl(v, 'build') * 0.1]);
+    if (openSites().some((id) => T(id).builders < T(id).maxB)) opts.push(['build', (2.2 + lvl(v, 'build') * 0.1) * v.w.build]);
     const scholars = S.vill.filter((x) => x.task && x.task.kind === 'study').length;
-    if (S.tech.cur && S.blds.some((id) => T(id) && T(id).type === 'library') && scholars < Math.max(1, Math.floor(pop / 4))) opts.push(['study', 0.5 + v.cur * 1.6 + lvl(v, 'study') * 0.05]);
-    opts.push(['farm', S.res.food < want.food + 6 ? 1.8 : 0.7]);
+    if (S.tech.cur && S.blds.some((id) => T(id) && T(id).type === 'library') && scholars < Math.max(1, Math.floor(pop / 4))) opts.push(['study', (0.5 + v.cur * 1.6 + lvl(v, 'study') * 0.05) * v.w.study]);
+    opts.push(['farm', (S.res.food < want.food + 6 ? 1.8 : 0.7) * v.w.farm]);
     for (const [kind, rs] of [['tree', 'wood'], ['rock', 'stone'], ['bush', 'food']]) {
       const sk = kind === 'tree' ? 'wood' : kind === 'rock' ? 'stone' : 'food';
-      opts.push([kind, (want[rs] - S.res[rs]) / want[rs] + 0.15 + R() * 0.3 + lvl(v, sk) * 0.04]);
+      opts.push([kind, ((want[rs] - S.res[rs]) / want[rs] + 0.15 + R() * 0.3 + lvl(v, sk) * 0.04) * v.w[kind]]);
     }
     opts.sort((a, b) => b[1] - a[1]);
     for (const [k] of opts) {
@@ -428,9 +487,9 @@
     switch (t.kind) {
       case 'gather': {
         const n = T(t.node); if (!n || (t.res === 'bush' && !n.berries)) { release(v); v.idle = 0.3; return; }
-        v.state = 'work'; v.timer = (t.res === 'bush' ? 1.5 : 2.4) * (hasTech('tools') ? 0.75 : 1) / skillMult(v, roleOf(t.res)); break;
+        v.state = 'work'; v.timer = (t.res === 'bush' ? 1.5 : 2.4) * (hasTech('tools') ? 0.75 : 1) / skillMult(v, roleOf(t.res)) / eff('work_speed'); break;
       }
-      case 'farm': v.state = 'work'; v.timer = 2 * (hasTech('tools') ? 0.75 : 1) / skillMult(v, 'food'); break;
+      case 'farm': v.state = 'work'; v.timer = 2 * (hasTech('tools') ? 0.75 : 1) / skillMult(v, 'food') / eff('work_speed'); break;
       case 'build': { const s = T(t.site); if (!s || s.done) { release(v); v.idle = 0.2; return; } v.state = 'work'; v.timer = 1e9; break; }
       case 'study': v.state = 'work'; v.timer = 8 / skillMult(v, 'study') / (hasTech('astro') ? 1.25 : 1); break;
       case 'sleep': {
@@ -450,18 +509,18 @@
     if (t.kind === 'gather') {
       const n = T(t.node), kind = t.res; let amt;
       if (!n) { release(v); v.state = 'idle'; return; }
-      const carryBonus = hasTech('wheel') ? 2 : 0;
+      const carryBonus = (hasTech('wheel') ? 2 : 0) + Math.round((eff('carry') - 1) * 10);
       if (kind === 'tree') { amt = 3 + carryBonus + (hasTech('sawmill') ? 2 : 0); dropObj(n); const g = G(Math.floor(v.x), Math.floor(v.y)); }
       else if (kind === 'rock') { amt = 2 + carryBonus + (hasTech('quarry') ? 2 : 0); n.amt--; if (n.amt <= 0) dropObj(n); else n.claimed = 0; }
       else { amt = 2 + (hasTech('wheel') ? 1 : 0); n.berries = false; n.regrow = 90 + R() * 40; n.claimed = 0; }
-      v.sk[roleOf(kind)] += 1;
+      v.sk[roleOf(kind)] += 1; learn(v, kind);
       ev('burst', v.x, v.y, v.z + 1, { c: kind });
       v.carry = { t: roleOf(kind), n: amt }; v.task = null; v.state = 'idle'; deliver(v);
     } else if (t.kind === 'farm') {
-      const f = T(t.farm); if (f && f.growth >= 1) { f.growth = 0; v.carry = { t: 'food', n: 5 + (hasTech('wheel') ? 1 : 0) }; v.sk.food += 1; }
+      const f = T(t.farm); if (f && f.growth >= 1) { f.growth = 0; v.carry = { t: 'food', n: 5 + (hasTech('wheel') ? 1 : 0) }; v.sk.food += 1; learn(v, 'farm'); }
       if (f) f.claimed = 0; v.task = null; v.state = 'idle'; if (v.carry) deliver(v);
     } else if (t.kind === 'study') {
-      v.sk.study += 1; addKnowledge(v, 1 + lvl(v, 'study') * 0.15); v.task = null; v.state = 'idle'; v.idle = 0.3;
+      v.sk.study += 1; learn(v, 'study'); addKnowledge(v, 1 + lvl(v, 'study') * 0.15); v.task = null; v.state = 'idle'; v.idle = 0.3;
     } else { release(v); v.state = 'idle'; }
   }
   function moveV(v, dt) {
@@ -469,10 +528,10 @@
     const [tx, ty] = v.path[0];
     if (!walkable(tx, ty)) { release(v); v.path = []; v.state = 'idle'; v.idle = 0.3; return; }
     const cx = tx + 0.5, cy = ty + 0.5, dx = cx - v.x, dy = cy - v.y, d = Math.hypot(dx, dy), g = G(Math.floor(v.x), Math.floor(v.y));
-    const sp = v.speed * v.dil * (S.res.food <= 0 ? 0.7 : 1) * (g && g.d ? 1.3 : 1) * dt;
+    const sp = v.speed * v.dil * eff('walk') * (S.res.food <= 0 ? 0.7 : 1) * (g && g.d ? 1.3 : 1) * dt;
     if (d <= sp) {
       v.x = cx; v.y = cy; v.path.shift();
-      const t = G(tx, ty); if (t) { t.tr++; if (t.tr > 70 && !t.d && t.k === 'grass' && !t.o) t.d = 1; }
+      const t = G(tx, ty); if (t) { t.tr++; if (t.tr > 260 && !t.d && t.k === 'grass' && !t.o) t.d = 1; }
     } else { v.x += (dx / d) * sp; v.y += (dy / d) * sp; }
     v.face = dx - dy >= 0 ? 1 : -1; v.bob += dt * 9;
   }
@@ -489,9 +548,9 @@
       const t = v.task;
       if (t && t.kind === 'build') {
         const s = T(t.site); if (!s || s.done) { release(v); v.state = 'idle'; v.idle = 0.2; return; }
-        s.prog += (dt / s.time) * skillMult(v, 'build') * (hasTech('tools') ? 1.25 : 1) * (hasTech('guild') ? 1.4 : 1);
+        s.prog += (dt / s.time) * skillMult(v, 'build') * (hasTech('tools') ? 1.25 : 1) * (hasTech('guild') ? 1.4 : 1) * eff('build') * eff('work_speed');
         v.sk.build += dt * 0.25;
-        if (s.prog >= 1) { s.prog = 1; finishSite(s); release(v); v.state = 'idle'; v.idle = 0.2; }
+        if (s.prog >= 1) { s.prog = 1; learn(v, 'build'); finishSite(s); release(v); v.state = 'idle'; v.idle = 0.2; }
       } else { v.timer -= dt; if (v.timer <= 0) finishWork(v); }
     }
   }
@@ -502,7 +561,7 @@
     const day = Math.floor(S.time / DAYLEN);
     if (day !== S.lastDay) { S.lastDay = day; S.nightLogged = false; if (day > 0) log('Dag ' + (day + 1) + ' begynner.'); }
     if (light() < sleepLight() && !S.nightLogged) { S.nightLogged = true; log('Natten faller. Lysene tennes.'); }
-    const growth = (hasTech('irrig') ? 1.6 : 1) * (hasTech('windmill') ? 1 + 0.3 * Math.min(3, count('mill')) : 1);
+    const growth = eff('farm_growth') * (hasTech('irrig') ? 1.6 : 1) * (hasTech('windmill') ? 1 + 0.3 * Math.min(3, count('mill')) : 1);
     if (light() > 0.3) for (const id of S.blds) { const b = T(id); if (b && b.type === 'farm') b.growth = Math.min(1, b.growth + (dt / 55) * growth); }
     for (const k in S.objs) { const o = S.objs[k]; if (o.type === 'bush' && !o.berries) { o.regrow -= dt; if (o.regrow <= 0) { o.berries = true; o.claimed = 0; } } }
     if (R() < dt * 0.6) {
@@ -525,7 +584,7 @@
     if (S.growT >= (hasTech('harvest') ? 30 : 45)) { S.growT = 0; if (S.res.food >= 8 && S.vill.length < cap() && S.vill.length < 140) { const f = T(S.storages[0]); addVillager(f.x, f.y + 2); if (S.vill.length % 5 === 0) log('Landsbyen har nå ' + S.vill.length + ' innbyggere.'); } }
     S.eatT += dt;
     if (S.eatT >= 60) {
-      S.eatT = 0; S.res.food = Math.max(0, S.res.food - Math.ceil(S.vill.length * (hasTech('medicine') ? 0.45 : 0.6)));
+      S.eatT = 0; S.res.food = Math.max(0, S.res.food - Math.ceil(S.vill.length * (hasTech('medicine') ? 0.45 : 0.6) / eff('food_save')));
       if (S.res.food <= 0 && S.hungerDay !== S.lastDay) { S.hungerDay = S.lastDay; log('Det er tomt for mat.'); }
     }
     for (const v of S.vill) { v.age += dt; updateV(v, dt); }
@@ -536,9 +595,9 @@
     while (n-- > 0) { step(DT); if (onStep && n % 200 === 0) onStep(total - n, total); }
   }
   return {
-    GW, GH, DAYLEN, DT, DEF, TECHS, NB4,
+    GW, GH, DAYLEN, DT, DEF, TECHS, NB4, EFFECTS,
     get S() { return S; },
     create, load, serialize, step, advance, scan,
-    helpers: { G, OB, T, elev, phase, light, cap, hasTech, lvl, houses, count, nextType, availableTechs, tile, walkable }
+    helpers: { defOf, eff, techInfo, applyCouncil, summary, sanitize, G, OB, T, elev, phase, light, cap, hasTech, lvl, houses, count, nextType, availableTechs, tile, walkable }
   };
 });

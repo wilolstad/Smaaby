@@ -3,6 +3,7 @@ import fs from 'node:fs';
 import { createRequire } from 'node:module';
 const require = createRequire(import.meta.url);
 const Sim = require('./sim.js');
+import { consult } from './council.mjs';
 const FILE = 'state.json';
 const MAX_CATCHUP = 3 * 3600; // never simulate more than three hours in one run
 const now = Date.now();
@@ -14,6 +15,13 @@ if (fs.existsSync(FILE)) {
   const elapsed = Math.min(MAX_CATCHUP, Math.max(0, (now - (meta.savedAt || now)) / 1000));
   console.log(`Fast-forwarding ${elapsed.toFixed(0)} s of village life`);
   Sim.advance(elapsed);
+  try {
+    const S0 = Sim.S;
+    if (process.env.GITHUB_TOKEN && S0.invq.length < 2) {
+      const r = await consult(Sim.helpers.summary(), process.env.GITHUB_TOKEN);
+      console.log('Council proposed', Sim.helpers.applyCouncil(r), 'inventions');
+    }
+  } catch (e) { console.log('Council unavailable:', String(e.message || e).slice(0, 200)); }
 } else {
   Sim.create((now & 0x7fffffff) | 1);
   meta = { bornAt: now };

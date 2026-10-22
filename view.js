@@ -50,6 +50,7 @@ function drawBuilding(b,x,y,g){
  case 'mill':{bk(x,y,.2,e,e+2.6,[214,200,170],.84,.66,1);roof(x,y,e+2.6,.14,.9,[140,100,70]);const c=iso(x+.5,y+.95,e+2.2),a=tnow*1.2;ctx.strokeStyle='#e8dcc0';ctx.lineWidth=2.4;for(let i=0;i<4;i++){const an=a+i*Math.PI/2;ctx.beginPath();ctx.moveTo(c[0],c[1]);ctx.lineTo(c[0]+Math.cos(an)*17,c[1]+Math.sin(an)*17);ctx.stroke()}ctx.fillStyle='#5a3b22';ctx.beginPath();ctx.arc(c[0],c[1],2.5,0,6.3);ctx.fill();break}
  case 'farm':{bk(x,y,0,e,e+.12,[116,82,52],.8,.62,1);const gr=b.growth,col=gr>=1?[232,196,70]:[90+gr*120,170-gr*10,70-gr*10];for(let r=0;r<3;r++)for(let k=0;k<3;k++){const u=.2+r*.3,w=.2+k*.3,c=iso(x+u,y+w,e+.12),hh=2+gr*7;ctx.fillStyle=rgb(col,.9);ctx.fillRect(c[0]-1.5,c[1]-hh,3,hh);ctx.fillStyle=rgb(col,1.15);ctx.fillRect(c[0]-1.5,c[1]-hh-1,3,2)}break}
  case 'tent':{roof(x,y,e,.1,2.2,[222,214,196]);if(light<.4)lights.push([...iso(x+.5,y+.9,e+.5),60,[255,190,100],.6]);break}
+ default:{const sh=(S.defs[b.type]||{}).shape;if(sh){const hh=sh.height*age,c=sh.color;bk(x,y,.1,e,e+hh,c,.84,.66,1.02);face('L',x+.1,y+.1,x+.9,y+.9,.3,.65,e+hh*.4,e+hh*.7,night>.4?'#ffd27a':rgb([40,50,70],1));if(sh.roof==='pointed')roof(x,y,e+hh,0,1.4*age,[Math.min(255,c[0]*.7+50),c[1]*.5,c[2]*.5]);else if(sh.roof==='flat')bk(x,y,.02,e+hh,e+hh+.3,[c[0]*.7,c[1]*.7,c[2]*.7],.8,.62,1);else if(sh.roof==='dome'){const p=iso(x+.5,y+.5,e+hh+.2);ctx.fillStyle=rgb(c,.9);ctx.beginPath();ctx.ellipse(p[0],p[1],14,9,0,Math.PI,0);ctx.fill()}if(night>.4)lights.push([...iso(x+.5,y+.9,e+hh*.5),70,[255,210,120],.7])}}
  }}
 function drawSite(s,x,y,g){
  const e=g.h,P=s.prog,ix=s.x,iy=s.y,sz=s.size,hh=(s.what==='tower'?5:s.what==='farm'?.2:2.2)*P;
@@ -140,16 +141,17 @@ function hud(){
  const r=S.res;$('rw').textContent=Math.floor(r.wood);$('rs').textContent=Math.floor(r.stone);$('rf').textContent=Math.floor(r.food);$('rp').textContent=S.vill.length+'/'+h.cap();$('rb').textContent=S.blds.length;$('ri').textContent=S.islands;
  const p=h.phase(),lab=p<.12?'morgen':p<.55?'dag':p<.7?'kveld':p<.92?'natt':'daggry';
  $('clock').textContent='Dag '+(Math.floor(S.time/Sim.DAYLEN)+1)+' · '+lab+' · '+(live?'live':'simulerer');
- const te=$('tech'),cur=S.tech.cur,done=Object.keys(S.tech.done);te.replaceChildren();
- const b=document.createElement('b');b.textContent=cur?'Forsker på: '+Sim.TECHS[cur].n:'Alt er oppfunnet';te.appendChild(b);
- if(cur){const bar=document.createElement('div');bar.className='bar';const i=document.createElement('i');i.style.width=Math.min(100,100*S.tech.prog/Sim.TECHS[cur].cost)+'%';bar.appendChild(i);te.appendChild(bar);const d=document.createElement('small');d.textContent=Sim.TECHS[cur].d;te.appendChild(d)}
- const l=document.createElement('div');l.style.marginTop='6px';const sm=document.createElement('small');sm.textContent='Funnet ('+done.length+'/'+Object.keys(Sim.TECHS).length+'): '+(done.map(k=>Sim.TECHS[k].n).join(', ')||'ingenting ennå');l.appendChild(sm);te.appendChild(l);
+ const te=$('tech'),cur=S.tech.cur,done=Object.keys(S.tech.done).concat(Object.keys(S.inv));const TI=h.techInfo;te.replaceChildren();
+ const b=document.createElement('b');b.textContent=cur?'Forsker på: '+TI(cur).n:'Alt er oppfunnet';te.appendChild(b);
+ if(cur){const bar=document.createElement('div');bar.className='bar';const i=document.createElement('i');i.style.width=Math.min(100,100*S.tech.prog/TI(cur).cost)+'%';bar.appendChild(i);te.appendChild(bar);const d=document.createElement('small');d.textContent=TI(cur).d+(TI(cur).src?' · '+TI(cur).src:'');te.appendChild(d)}
+ const l=document.createElement('div');l.style.marginTop='6px';const sm=document.createElement('small');sm.textContent=(S.goal?'Mål: '+S.goal+' · ':'')+'Funnet ('+done.length+'): '+(done.slice(-8).map(k=>TI(k).n).join(', ')||'ingenting ennå');l.appendChild(sm);te.appendChild(l);
  const c=$('card');if(selected){c.hidden=false;const v=selected;c.replaceChildren();const s=document.createElement('strong');s.textContent=v.name;c.appendChild(s);
   const l1=document.createElement('div');l1.textContent=(v.sleeping?'Sover':ROLEN[v.role])+' · '+v.trait;c.appendChild(l1);
   const l2=document.createElement('div');const sp=document.createElement('span');sp.textContent=v.carry?'Bærer '+v.carry.n+' '+RESN[v.carry.t]:(v.state==='walk'?'På vei':v.state==='work'?'Jobber':'Venter');l2.appendChild(sp);c.appendChild(l2);
-  const l3=document.createElement('div');const s3=document.createElement('span');s3.textContent='Tre '+h.lvl(v,'wood')+' · Stein '+h.lvl(v,'stone')+' · Mat '+h.lvl(v,'food')+' · Bygg '+h.lvl(v,'build')+' · Forskning '+h.lvl(v,'study');l3.appendChild(s3);c.appendChild(l3)}else c.hidden=true;
+  const l3=document.createElement('div');const s3=document.createElement('span');s3.textContent='Tre '+h.lvl(v,'wood')+' · Stein '+h.lvl(v,'stone')+' · Mat '+h.lvl(v,'food')+' · Bygg '+h.lvl(v,'build')+' · Forskning '+h.lvl(v,'study')+' · Hjerne: '+Object.entries(v.w).sort((a,b)=>b[1]-a[1]).slice(0,2).map(e=>({build:'bygg',study:'forsk',tree:'tre',rock:'stein',bush:'sanke',farm:'åker'})[e[0]]+' '+e[1].toFixed(1)).join(', ');l3.appendChild(s3);c.appendChild(l3);const th=S.thoughts[v.name];const l4=document.createElement('div');l4.style.marginTop='4px';l4.textContent='«'+(th?th.text:thoughtOf(v))+'»';c.appendChild(l4)}else c.hidden=true;
  renderLog();
 }
+function thoughtOf(v){const r=S.res;if(v.sleeping)return 'Zzz...';if(r.food<20)return 'Vi må skaffe mer mat.';if(r.stone<5)return 'Vi trenger stein.';if(r.wood<10)return 'Det blir lite tre igjen.';const top=Object.entries(v.w).sort((a,b)=>b[1]-a[1])[0][0];return ({build:'Jeg elsker å bygge.',study:'Jeg vil forstå mer.',tree:'Skogen kaller på meg.',rock:'Stein er min greie.',bush:'Jeg liker å sanke.',farm:'Åkeren trenger meg.'})[top]}
 const ctl=$('ctl');
 const mk=(t,fn,tog,id)=>{const b=document.createElement('button');b.type='button';b.textContent=t;if(id)b.dataset.id=id;if(tog)b.setAttribute('aria-pressed',false);b.onclick=()=>fn(b);ctl.appendChild(b);return b};
 [1,4,16,64].forEach(s=>mk(s+'×',b=>{speed=s;live=false;ctl.querySelectorAll('[data-id^=sp]').forEach(x=>x.setAttribute('aria-pressed',x===b))},true,'sp'+s));
