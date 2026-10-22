@@ -1,0 +1,32 @@
+name: Småby tick
+on:
+  schedule:
+    - cron: '*/5 * * * *'
+  workflow_dispatch:
+permissions:
+  contents: write
+concurrency:
+  group: smaaby-tick
+  cancel-in-progress: false
+jobs:
+  tick:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 20
+      - name: Fetch previous world state (if any)
+        run: git fetch origin state --depth=1 && git show FETCH_HEAD:state.json > state.json || echo "no previous state"
+      - name: Advance the village
+        run: node tick.mjs
+      - name: Publish state (single force-pushed commit, no history bloat)
+        run: |
+          mkdir ../out && cp state.json ../out/
+          cd ../out
+          git init -q -b state
+          git config user.name "smaaby-bot"
+          git config user.email "smaaby-bot@users.noreply.github.com"
+          git add state.json
+          git commit -qm "state $(date -u +%FT%TZ)"
+          git push -f "https://x-access-token:${{ secrets.GITHUB_TOKEN }}@github.com/${{ github.repository }}.git" state

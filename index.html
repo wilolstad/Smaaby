@@ -1,0 +1,47 @@
+<!doctype html>
+<html lang="no"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover"><title>Småby</title>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Bricolage+Grotesque:opsz,wght@12..96,500;12..96,700&family=IBM+Plex+Mono:wght@400;500&display=swap">
+<style>
+/* A floating island seen from a drone: sky is the backdrop, the UI is quiet dark glass, colour belongs to the world. */
+:root{--bg:#0d1220;--panel:rgba(14,18,30,.72);--fg:#f2efe8;--dim:#a3abbd;--line:rgba(242,239,232,.16);--hot:#ffb347;color-scheme:dark}
+html,body{height:100%}
+body{margin:0;background:var(--bg);color:var(--fg);font-family:'IBM Plex Mono',ui-monospace,monospace;font-size:12px;overflow:hidden}
+.stage{position:relative;height:100%;min-height:24rem;touch-action:none;user-select:none;-webkit-user-select:none}
+canvas{position:absolute;inset:0;width:100%;height:100%;display:block;cursor:grab}
+canvas:active{cursor:grabbing}
+.pad{padding-left:max(14px,env(safe-area-inset-left,0px));padding-right:max(14px,env(safe-area-inset-right,0px))}
+.hud{position:absolute;top:0;left:0;right:0;padding-block:14px;display:flex;flex-wrap:wrap;gap:8px 16px;align-items:center;pointer-events:none}
+h1{font-family:'Bricolage Grotesque',system-ui,sans-serif;font-weight:700;font-size:clamp(1.5rem,4.5vw,2.2rem);margin:0;letter-spacing:-.02em;line-height:1;text-shadow:0 2px 10px rgba(0,0,0,.45)}
+#clock{margin:3px 0 0;color:var(--fg);opacity:.85;text-shadow:0 1px 6px rgba(0,0,0,.6)}
+.pills{display:flex;flex-wrap:wrap;gap:6px}
+.pill{background:var(--panel);border:1px solid var(--line);border-radius:999px;padding:5px 11px;display:inline-flex;gap:7px;align-items:center;backdrop-filter:blur(8px);-webkit-backdrop-filter:blur(8px);font-variant-numeric:tabular-nums}
+.pill b{font-weight:500}
+.dot{width:9px;height:9px;border-radius:2px;display:inline-block}
+.bottom{position:absolute;left:0;right:0;bottom:0;padding-block:12px;padding-bottom:max(12px,env(safe-area-inset-bottom,0px));display:flex;flex-direction:column;gap:8px;pointer-events:none}.row{display:flex;justify-content:space-between;align-items:flex-end;gap:10px}.ctl{display:flex;gap:6px;flex-wrap:wrap;justify-content:center;pointer-events:auto}
+.hud{padding-right:0}
+button{font:inherit;color:var(--fg);background:var(--panel);border:1px solid var(--line);border-radius:10px;padding:7px 10px;cursor:pointer;backdrop-filter:blur(8px);-webkit-backdrop-filter:blur(8px);min-height:34px}
+button:hover{border-color:var(--dim)}
+button[aria-pressed=true]{border-color:var(--hot);color:var(--hot)}
+button:focus-visible{outline:2px solid var(--hot);outline-offset:2px}
+.log{display:flex;min-width:0;flex-direction:column;gap:4px;pointer-events:none;max-width:min(24rem,60vw)}
+.log div{background:var(--panel);border:1px solid var(--line);border-radius:8px;padding:5px 9px;backdrop-filter:blur(8px);-webkit-backdrop-filter:blur(8px);animation:in .4s ease-out}
+@keyframes in{from{opacity:0;transform:translateY(6px)}to{opacity:1;transform:none}}
+.card{pointer-events:auto;flex:none;background:var(--panel);border:1px solid var(--line);border-radius:12px;padding:10px 13px;min-width:11rem;max-width:min(16rem,48vw);backdrop-filter:blur(10px);-webkit-backdrop-filter:blur(10px);line-height:1.5}
+.card strong{font-family:'Bricolage Grotesque',system-ui,sans-serif;font-size:16px}
+.card span{color:var(--dim)}
+@media (prefers-reduced-motion:reduce){.log div{animation:none}}
+
+.tech{pointer-events:auto;background:var(--panel);border:1px solid var(--line);border-radius:12px;padding:9px 12px;backdrop-filter:blur(10px);-webkit-backdrop-filter:blur(10px);max-width:min(17rem,60vw);line-height:1.45}
+.tech b{font-family:'Bricolage Grotesque',system-ui,sans-serif;font-size:14px;font-weight:700}
+.bar{height:5px;border-radius:3px;background:var(--line);margin:5px 0 3px;overflow:hidden}.bar i{display:block;height:100%;background:var(--hot)}
+.tech small{color:var(--dim)}
+.right{position:absolute;top:0;right:0;padding-block:14px;pointer-events:none;display:flex;flex-direction:column;gap:8px;align-items:flex-end}
+.live{color:#7ee787}
+</style></head><body><div class="stage" id="stage">
+<canvas id="cv"></canvas>
+<div class="hud pad"><div><h1>Småby</h1><p id="clock"></p></div>
+<div class="pills"><span class="pill"><i class="dot" style="background:#b9783a"></i>Tre <b id="rw">0</b></span><span class="pill"><i class="dot" style="background:#9aa3b5"></i>Stein <b id="rs">0</b></span><span class="pill"><i class="dot" style="background:#e5484d"></i>Mat <b id="rf">0</b></span><span class="pill">Innbyggere <b id="rp">0</b></span><span class="pill">Bygg <b id="rb">0</b></span><span class="pill">Øyer <b id="ri">1</b></span></div></div>
+<div class="right pad"><div class="tech" id="tech"></div></div>
+<div class="bottom pad"><div class="row"><div class="log" id="log"></div><div class="card" id="card" hidden></div></div><div class="ctl" id="ctl"></div></div>
+</div>
+<script src="sim.js"></script><script src="view.js"></script></body></html>
