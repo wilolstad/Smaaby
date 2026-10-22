@@ -140,7 +140,7 @@ function renderLog(){const el=$('log');const items=S.log.slice(-5);const key=ite
 function hud(){
  const r=S.res;$('rw').textContent=Math.floor(r.wood);$('rs').textContent=Math.floor(r.stone);$('rf').textContent=Math.floor(r.food);$('rp').textContent=S.vill.length+'/'+h.cap();$('rb').textContent=S.blds.length;$('ri').textContent=S.islands;
  const p=h.phase(),lab=p<.12?'morgen':p<.55?'dag':p<.7?'kveld':p<.92?'natt':'daggry';
- $('clock').textContent='Dag '+(Math.floor(S.time/Sim.DAYLEN)+1)+' · '+lab+' · '+(speed===scale?'live ('+scale+'×)':speed+'×');
+ $('clock').textContent='Dag '+(Math.floor(S.time/Sim.DAYLEN)+1)+' · '+lab+' · '+speed+'×'+(note?' · '+note:'');
  const te=$('tech'),cur=S.tech.cur,done=Object.keys(S.tech.done).concat(Object.keys(S.inv));const TI=h.techInfo;te.replaceChildren();
  const b=document.createElement('b');b.textContent=cur?'Forsker på: '+TI(cur).n:'Alt er oppfunnet';te.appendChild(b);
  if(cur){const bar=document.createElement('div');bar.className='bar';const i=document.createElement('i');i.style.width=Math.min(100,100*S.tech.prog/TI(cur).cost)+'%';bar.appendChild(i);te.appendChild(bar);const d=document.createElement('small');d.textContent=TI(cur).d+(TI(cur).src?' · '+TI(cur).src:'');te.appendChild(d)}
@@ -152,17 +152,23 @@ function hud(){
  renderLog();
 }
 function thoughtOf(v){const r=S.res;if(v.sleeping)return 'Zzz...';if(r.food<20)return 'Vi må skaffe mer mat.';if(r.stone<5)return 'Vi trenger stein.';if(r.wood<10)return 'Det blir lite tre igjen.';const top=Object.entries(v.w).sort((a,b)=>b[1]-a[1])[0][0];return ({build:'Jeg elsker å bygge.',study:'Jeg vil forstå mer.',tree:'Skogen kaller på meg.',rock:'Stein er min greie.',bush:'Jeg liker å sanke.',farm:'Åkeren trenger meg.'})[top]}
-const save=x=>{try{localStorage.setItem('smaaby.speed',String(x))}catch(e){}};
-const load=()=>{try{return localStorage.getItem('smaaby.speed')}catch(e){return null}};
+const tokGet=()=>{try{return localStorage.getItem('smaaby.token')||''}catch(e){return ''}};
+const tokSet=x=>{try{x?localStorage.setItem('smaaby.token',x):localStorage.removeItem('smaaby.token')}catch(e){}};
+let note='';
+async function pushScale(n){
+ const tok=tokGet();if(!tok){note='bare lokalt (ingen token)';return}
+ const m=location.hostname.match(/^([^.]+)\.github\.io$/),repo=location.pathname.split('/')[1];if(!m||!repo){note='bare lokalt';return}
+ const url='https://api.github.com/repos/'+m[1]+'/'+repo+'/contents/speed.json',H={Authorization:'Bearer '+tok,Accept:'application/vnd.github+json'};
+ try{note='lagrer...';let sha;const g=await fetch(url,{headers:H});if(g.ok)sha=(await g.json()).sha;
+  const p=await fetch(url,{method:'PUT',headers:H,body:JSON.stringify({message:'speed '+n+'x',content:btoa(JSON.stringify({scale:n})),sha,branch:'main'})});
+  note=p.ok?'serveren går nå '+n+'× (fra neste tick)':'feilet ('+p.status+') – sjekk token';if(p.ok)scale=n}catch(e){note='feilet – ingen kontakt'}}
 const ctl=$('ctl');
 const mk=(t,fn,tog,id)=>{const b=document.createElement('button');b.type='button';b.textContent=t;if(id)b.dataset.id=id;if(tog)b.setAttribute('aria-pressed',false);b.onclick=()=>fn(b);ctl.appendChild(b);return b};
-mk('Live',b=>{speed=scale;save('live');ctl.querySelectorAll('[data-id^=sp]').forEach(x=>x.setAttribute('aria-pressed',x===b))},true,'splive');
-[1,4,16,64].forEach(s=>mk(s+'×',b=>{speed=s;save(s);ctl.querySelectorAll('[data-id^=sp]').forEach(x=>x.setAttribute('aria-pressed',x===b))},true,'sp'+s));
-ctl.querySelector('[data-id=splive]').setAttribute('aria-pressed',true);
-function restoreSpeed(){const s=load();if(!s||s==='live')return;const n=Number(s);const b=ctl.querySelector('[data-id=sp'+n+']');if(b){speed=n;ctl.querySelectorAll('[data-id^=sp]').forEach(x=>x.setAttribute('aria-pressed',x===b))}}
+[1,4,16,32,64].forEach(s=>mk(s+'×',b=>{speed=s;ctl.querySelectorAll('[data-id^=sp]').forEach(x=>x.setAttribute('aria-pressed',x===b));pushScale(s)},true,'sp'+s));
+function markSpeed(){ctl.querySelectorAll('[data-id^=sp]').forEach(x=>x.setAttribute('aria-pressed',x.dataset.id==='sp'+speed))}
 mk('Pause',b=>{paused=!paused;b.textContent=paused?'Spill':'Pause';b.setAttribute('aria-pressed',paused)},true);
 const ab=mk('Auto-kamera',b=>{auto=!auto;b.setAttribute('aria-pressed',auto)},true);ab.setAttribute('aria-pressed',true);
-mk('+',()=>cam.z=clamp(cam.z*1.2,.3,2.4));mk('−',()=>cam.z=clamp(cam.z/1.2,.3,2.4));
+mk('Token',()=>{const t=prompt('Lim inn GitHub-token (fine-grained, kun repoet Smaaby, Contents: Read and write). Tom = fjern.',tokGet());if(t!==null)tokSet(t.trim())});mk('+',()=>cam.z=clamp(cam.z*1.2,.3,2.4));mk('−',()=>cam.z=clamp(cam.z/1.2,.3,2.4));
 const ptrs=new Map();let drag=false,pd=0,sx0=0,sy0=0;
 cv.addEventListener('pointerdown',e=>{cv.setPointerCapture(e.pointerId);ptrs.set(e.pointerId,[e.clientX,e.clientY]);drag=false;sx0=e.clientX;sy0=e.clientY;if(ptrs.size===2){const [a,b]=[...ptrs.values()];pd=Math.hypot(a[0]-b[0],a[1]-b[1])}});
 cv.addEventListener('pointermove',e=>{if(!ptrs.has(e.pointerId))return;const p=ptrs.get(e.pointerId);
@@ -185,13 +191,19 @@ function start(){
  S=Sim.S;h=Sim.helpers;GW=Sim.GW;GH=Sim.GH;S.ev=[];
  const c=iso(GW/2,GH/2,1);cam.x=c[0];cam.y=c[1];cam.z=clamp(W/1400,.4,.9);
  requestAnimationFrame(t=>{last=t;loop(t)})}
-fetch(STATE_URL+'?'+Date.now()).then(r=>{if(!r.ok)throw 0;return r.json()}).then(j=>{
- if(!j.state||j.state.v!==3)throw 0;Sim.load(j.state);savedAt=j.meta.savedAt||Date.now();
- scale=j.meta.scale||1;speed=scale;restoreSpeed();
+function boot(){fetch(STATE_URL+'?'+Date.now()).then(r=>{if(!r.ok)throw 0;return r.json()}).then(j=>{
+ if(!j.state||j.state.v!==3)throw 1;Sim.load(j.state);savedAt=j.meta.savedAt||Date.now();
+ scale=j.meta.scale||1;speed=scale;markSpeed();
  let behind=Math.min(3600,Math.max(0,(Date.now()-savedAt)/1000*scale));
  const total=behind;
  (function chunk(){const t0=performance.now();while(behind>0&&performance.now()-t0<14){Sim.step(.5);behind-=.5}
   $('clock').textContent='Henter inn '+Math.round(100*(1-behind/Math.max(1,total)))+' %...';
   if(behind>0)setTimeout(chunk,0);else start()})();
+}).catch(e=>{
+ if(location.hostname==='localhost'){Sim.create(1234);Sim.advance(300);scale=1;speed=1;start();return}
+ $('clock').textContent=e===1?'Venter på at serveren lager en ny verden...':'Finner ikke verdenen ennå, prøver igjen...';
+ setTimeout(boot,15000)})}
+boot();
+})();
 }).catch(()=>{Sim.create(Date.now()&0x7fffffff);Sim.advance(300);scale=1;speed=1;start()});
 })();

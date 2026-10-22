@@ -6,7 +6,8 @@ const Sim = require('./sim.js');
 import { consult } from './council.mjs';
 const FILE = 'state.json';
 const MAX_CATCHUP = 6 * 3600; // never simulate more than six hours in one run
-const SCALE = Number(process.env.TIMESCALE) || 32; // village seconds per real second
+let fileScale = 0; try { fileScale = JSON.parse(fs.readFileSync('speed.json', 'utf8')).scale; } catch (e) {}
+const SCALE = Math.min(128, Math.max(0.5, Number(fileScale) || Number(process.env.TIMESCALE) || 32)); // village seconds per real second
 const now = Date.now();
 let meta;
 let raw = null;

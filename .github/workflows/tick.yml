@@ -15,6 +15,7 @@ concurrency:
 jobs:
   tick:
     runs-on: ubuntu-latest
+    timeout-minutes: 12
     steps:
       - uses: actions/checkout@v4
       - uses: actions/setup-node@v4
@@ -36,3 +37,4 @@ jobs:
           git add state.json
           git commit -qm "state $(date -u +%FT%TZ)"
           git push -f "https://x-access-token:${{ secrets.GITHUB_TOKEN }}@github.com/${{ github.repository }}.git" state
+# format v3
