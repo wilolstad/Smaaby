@@ -205,5 +205,3 @@ function boot(){fetch(STATE_URL+'?'+Date.now()).then(r=>{if(!r.ok)throw 0;return
  setTimeout(boot,15000)})}
 boot();
 })();
-}).catch(()=>{Sim.create(Date.now()&0x7fffffff);Sim.advance(300);scale=1;speed=1;start()});
-})();
