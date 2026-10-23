@@ -20,6 +20,9 @@
     bridge: { n: 'Bro', cost: { wood: 3 }, time: 7, size: 1 },
     market: { n: 'Marked', cost: { wood: 20, stone: 20 }, time: 34, size: 1 },
     temple: { n: 'Tempel', cost: { stone: 45, wood: 10 }, time: 44, size: 1 },
+    park: { n: 'Park', cost: { stone: 10, wood: 4 }, time: 18, size: 1 },
+    monument: { n: 'Monument', cost: { stone: 70 }, time: 40, size: 1 },
+    lighthouse: { n: 'Fyrtårn', cost: { stone: 50, wood: 10 }, time: 36, size: 1 },
     castle: { n: 'Slott', cost: { stone: 110, wood: 40 }, time: 70, size: 1 }
   };
   const TECHS = {
@@ -290,6 +293,7 @@
   // ---------- economy planning
   function nextType() {
     const h = count('house'), f = count('farm'), p = S.vill.length, c = cap();
+    const E = era();
     if (h < 1) return 'house';
     if (f < 1) return 'farm';
     if (p >= c - 1) return 'house';
@@ -299,12 +303,14 @@
     if (count('store') < Math.max(1, Math.ceil(h / 10)) && h >= 4) return 'store';
     if (count('tower') < Math.max(1, Math.ceil(h / 14)) && h >= 6) return 'tower';
     if (count('plaza') < Math.max(1, Math.ceil(h / 16)) && h >= 8) return 'plaza';
-    const E = era();
     if (E >= 1 && h >= 10 && count('market') < Math.ceil(h / 12)) return 'market';
     if (E >= 2 && h >= 14 && count('temple') < Math.ceil(h / 16)) return 'temple';
     if (E >= 3 && h >= 18 && count('castle') < Math.ceil(h / 24)) return 'castle';
     if (hasTech('windmill') && count('mill') < Math.floor(f / 3)) return 'mill';
-    if (p >= 8) for (const k in S.defs) if (count(k) < Math.max(S.defs[k].max, Math.ceil(h / 6)) && h >= 5) return k;
+    if (h >= 6 && count('park') < Math.ceil(h / 9)) return 'park';
+    if (E >= 1 && h >= 14 && count('monument') < Math.ceil(h / 22)) return 'monument';
+    if (E >= 2 && h >= 20 && count('lighthouse') < Math.ceil(h / 30)) return 'lighthouse';
+    if (p >= 8 && h >= 5) { let n = 0; for (const k in S.defs) { n += count(k); } if (n < 60) for (const k in S.defs) if (count(k) < Math.min(3, S.defs[k].max || 3)) return k; }
     return 'house';
   }
   function center() {
@@ -346,7 +352,7 @@
   function planner() {
     for (const id of S.sites.slice()) { const st = T(id); if (!st || st.done) continue; if (!st.born) st.born = S.time; if (st.prog === 0 && st.builders === 0 && S.time - st.born > 240) { const c = cost(st.what); for (const k in c) S.res[k] = Math.min(999, S.res[k] + Math.floor(c[k] * 0.8)); S.sites = S.sites.filter((x) => x !== id); dropObj(st); } }
     const open = openSites().length, pop = S.vill.length;
-    if (S.blds.length >= 240) return;
+    if (S.blds.length >= 260) return;
     if (open >= (pop >= 12 ? 3 : pop >= 8 ? 2 : 1)) return;
     const t = nextType();
     if (afford(cost(t))) {
@@ -858,8 +864,8 @@
     S.planT -= dt; if (S.planT <= 0) { S.planT = 2; planner(); }
     S.scanT -= dt; if (S.scanT <= 0) { S.scanT = hasTech('cartog') ? 10 : 20; scan(); }
     S.growT += dt;
-    if (S.vill.length > 110) for (let k = 0; k < 8 && S.vill.length > 100; k++) die(S.vill[S.vill.length - 1], 'dro på langferd');
-    if (S.growT >= (hasTech('harvest') ? 30 : 45)) { S.growT = 0; if (S.res.food >= 8 && S.vill.length < cap() && S.vill.length < 100) { const f = S.storages.map(T).find(Boolean); if (f) { addVillager(f.x, f.y + 2); if (S.vill.length % 5 === 0) log('Folket har nå ' + S.vill.length + ' innbyggere.'); } } }
+    if (S.vill.length > 170) for (let k = 0; k < 8 && S.vill.length > 160; k++) die(S.vill[S.vill.length - 1], 'dro på langferd');
+    if (S.growT >= (hasTech('harvest') ? 30 : 45)) { S.growT = 0; if (S.res.food >= 8 && S.vill.length < cap() && S.vill.length < 160) { const f = S.storages.map(T).find(Boolean); if (f) { addVillager(f.x, f.y + 2); if (S.vill.length % 5 === 0) log('Folket har nå ' + S.vill.length + ' innbyggere.'); } } }
     S.eatT += dt;
     if (S.eatT >= 60) {
       S.eatT = 0; S.res.food = Math.max(0, S.res.food - Math.ceil(S.vill.length * (hasTech('medicine') ? 0.45 : 0.6) / eff('food_save')));
