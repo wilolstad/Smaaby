@@ -154,6 +154,7 @@
     [[-2, 1], [2, -1]].forEach(([dx, dy]) => { const g = G(x + dx, y + dy); if (g && !g.o && g.k !== 'water') setObj(x + dx, y + dy, newObj({ type: 'tent', x: x + dx, y: y + dy, size: 1, cap: 2, sleepers: 0, tribe: c.id })); });
   }
   function create(seed) {
+    for (const k in COOL) delete COOL[k];
     for (const k in ECACHE) delete ECACHE[k];
     S = { v: 4, rs: seed | 0 || 1234567, time: 0, nid: 0, objs: {}, grid: [], log: [], vid: 0, lastDay: -1, nightLogged: false, ev: null, tribes: [], rel: {}, ct: null, deaths: 0 };
     genWorld();
@@ -232,14 +233,15 @@
   const cap = () => Math.floor((4 + houses() * (hasTech('masonry') ? 3 : 2)) * eff('pop_cap'));
   const cost = (type) => {
     const base = Object.assign({}, defOf(type).cost); if (type === 'house' && hasTech('timber')) { base.wood = 10; delete base.stone; }
-    const n = Math.max(0, count(type) - 2), f = type === 'landfill' || type === 'bridge' ? 1 : 1 + n * 0.08, out = {};
+    const n = Math.max(0, count(type) - 2), f = type === 'landfill' || type === 'bridge' ? 1 : Math.min(1.8, 1 + n * 0.08), out = {};
     for (const k in base) out[k] = Math.ceil(base[k] * f);
+    if (out.wood > 0 && S.res.wood < 25 && S.res.stone >= 120 && type !== 'bridge') { out.stone = (out.stone || 0) + out.wood * 2; out.wood = 0; }
     return out;
   };
   const afford = (c) => Object.entries(c).every(([k, v]) => S.res[k] >= v);
 
   // ---------- reachability + islands
-  const walkable = (x, y) => { const g = G(x, y); if (!g || g.k === 'water') return false; const o = OB(g); return !o || o.walk; };
+  const walkable = (x, y) => { const g = G(x, y); if (!g || g.k === 'water') return false; const o = OB(g); return !o || o.walk || (o.type !== 'tree' && o.type !== 'rock'); };
   function scan() {
     // flood fill over land (ignoring objects) from the fire
     const reach = new Uint8Array(GW * GH), fire = S.storages.map(T).find(Boolean) || S.blds.map(T).find(Boolean);
@@ -336,6 +338,7 @@
   }
   function openSites() { return S.sites.filter((id) => T(id) && !T(id).done); }
   function planner() {
+    for (const id of S.sites.slice()) { const st = T(id); if (!st || st.done) continue; if (!st.born) st.born = S.time; if (st.prog === 0 && st.builders === 0 && S.time - st.born > 240) { const c = cost(st.what); for (const k in c) S.res[k] = Math.min(999, S.res[k] + Math.floor(c[k] * 0.8)); S.sites = S.sites.filter((x) => x !== id); dropObj(st); } }
     const open = openSites().length, pop = S.vill.length;
     if (open >= (pop >= 12 ? 3 : pop >= 8 ? 2 : 1)) return;
     const t = nextType();
@@ -382,7 +385,7 @@
       return;
     }
     let c = goal, path = []; while (c >= 0) { path.push(c); c = prev[c]; } path.reverse();
-    const first = path[0]; if (path.length > 14) return;
+    const first = path[0];
     const type = bridge ? 'bridge' : 'landfill';
     if (!afford(cost(type))) return;
     if (G(first % GW, (first / GW) | 0).o) return;
@@ -463,7 +466,7 @@
     if (a.length && (!S.invq.length || R() < 0.5)) { S.tech.cur = a[Math.floor(R() * a.length)]; S.tech.prog = Math.min(S.tech.prog, 0.5 * TECHS[S.tech.cur].cost); return; }
     const p = S.invq.length ? S.invq.shift() : procInvention();
     const key = 'i' + S.ct.id + '_' + (++S.nInv);
-    S.invInfo[key] = Object.assign({}, p, { cost: Math.round(1500 + S.nInv * 220) });
+    S.invInfo[key] = Object.assign({}, p, { cost: Math.round(Math.min(40000, 1500 + S.nInv * 220)) });
     S.tech.cur = key; S.tech.prog = Math.min(S.tech.prog, 0.3 * S.invInfo[key].cost);
   }
   function addKnowledge(v, amt) {
@@ -504,22 +507,28 @@
   }
   const roleOf = (kind) => (kind === 'tree' ? 'wood' : kind === 'rock' ? 'stone' : 'food');
   function walkTo(v, path) { v.path = path; v.state = 'walk'; }
+  const COOL = {};
+  const cooling = (k, sx, sy) => (COOL[(S.ct ? S.ct.id : 0) + k + (sx >> 3) + ',' + (sy >> 3)] || 0) > S.time;
+  const coolSet = (k, sx, sy, d) => { COOL[(S.ct ? S.ct.id : 0) + k + (sx >> 3) + ',' + (sy >> 3)] = S.time + d; };
   function tryGather(v, kind) {
     const [sx, sy] = tile(v);
+    if (cooling(kind, sx, sy)) return false;
     const r = bfs(sx, sy, (x, y) => adj(x, y, (o) => (o.type === kind && !o.claimed && (kind !== 'bush' || o.berries) ? o : null)));
-    if (!r) return false;
+    if (!r) { coolSet(kind, sx, sy, 12); return false; }
     r.node.claimed = v.id; v.task = { kind: 'gather', res: kind, node: r.node.id, stage: 'go' }; v.role = roleOf(kind); walkTo(v, r.path); return true;
   }
   function tryBuild(v) {
     const [sx, sy] = tile(v);
-    const r = bfs(sx, sy, (x, y) => adj(x, y, (o) => (o.type === 'site' && !o.done && o.builders < o.maxB && o.tribe === S.ct.id ? o : null)));
-    if (!r) return false;
+    if (cooling('build', sx, sy)) return false;
+    const r = bfs(sx, sy, (x, y) => adj(x, y, (o) => (o.type === 'site' && !o.done && o.builders < o.maxB && o.tribe === S.ct.id ? o : null)), 4000);
+    if (!r) { coolSet('build', sx, sy, 8); return false; }
     r.node.builders++; v.task = { kind: 'build', site: r.node.id, reserved: true, stage: 'go' }; v.role = 'build'; walkTo(v, r.path); return true;
   }
   function tryFarm(v) {
     const [sx, sy] = tile(v);
+    if (cooling('farm', sx, sy)) return false;
     const r = bfs(sx, sy, (x, y) => adj(x, y, (o) => (o.type === 'farm' && o.growth >= 1 && !o.claimed && o.tribe === S.ct.id ? o : null)));
-    if (!r) return false;
+    if (!r) { coolSet('farm', sx, sy, 6); return false; }
     r.node.claimed = v.id; v.task = { kind: 'farm', farm: r.node.id, stage: 'go' }; v.role = 'farm'; walkTo(v, r.path); return true;
   }
   function tryStudy(v) {
@@ -543,6 +552,14 @@
     const r = bfs(sx, sy, (x, y) => (x === tx && y === ty ? {} : null), 500);
     if (r && r.path.length) { v.task = { kind: 'wander', stage: 'go' }; walkTo(v, r.path); } else v.idle = 1 + R() * 2;
   }
+  function unstick(v) {
+    const hub = S.storages.map(T).find(Boolean) || S.blds.map(T).find(Boolean); if (!hub) return false;
+    const c = [];
+    for (let r = 1; r <= 7; r++) { for (let dy = -r; dy <= r; dy++) for (let dx = -r; dx <= r; dx++) { if (Math.max(Math.abs(dx), Math.abs(dy)) !== r) continue; const x = hub.x + dx, y = hub.y + dy; if (walkable(x, y)) c.push([x, y]); } if (c.length >= 6) break; }
+    if (!c.length) return false;
+    const [x, y] = c[Math.floor(R() * c.length)], g = G(x, y);
+    v.x = x + 0.5; v.y = y + 0.5; v.z = g.h; v.path = []; v.task = null; v.state = 'idle'; v.idle = 0.2; return true;
+  }
   function think(v) {
     if (light() < sleepLight()) { if (trySleep(v)) return; v.idle = 2; return; }
     if (v.raid && raidThink(v)) return;
@@ -559,11 +576,13 @@
     }
     opts.sort((a, b) => b[1] - a[1]);
     for (const [k] of opts) {
-      if (k === 'build' && tryBuild(v)) return;
-      if (k === 'study' && tryStudy(v)) return;
-      if (k === 'farm' && tryFarm(v)) return;
-      if ((k === 'tree' || k === 'rock' || k === 'bush') && tryGather(v, k)) return;
+      if (k === 'build' && tryBuild(v)) { v.fail = 0; return; }
+      if (k === 'study' && tryStudy(v)) { v.fail = 0; return; }
+      if (k === 'farm' && tryFarm(v)) { v.fail = 0; return; }
+      if ((k === 'tree' || k === 'rock' || k === 'bush') && tryGather(v, k)) { v.fail = 0; return; }
     }
+    v.fail = (v.fail || 0) + 1;
+    if (v.fail >= 3 && unstick(v)) { v.fail = 0; return; }
     wander(v);
   }
   function raidThink(v) {
@@ -852,8 +871,12 @@
     const al0 = alive();
     if (al0.length) {
       const pickReach = () => { const tc = al0[Math.floor(R() * al0.length)]; if (!tc.reach) return null; for (let t = 0; t < 40; t++) { const i = Math.floor(R() * GW * GH); if (tc.reach[i]) return [i % GW, (i / GW) | 0]; } return null; };
-      if (R() < dt * 0.5) {
-        const p = pickReach(); if (p) { const [x, y] = p, g = G(x, y); if (g.k === 'grass' && !g.o && !g.d) { const nb = OB(G(x + 1, y)) || OB(G(x, y + 1)) || OB(G(x - 1, y)) || OB(G(x, y - 1)); if ((nb && nb.type === 'tree') || R() < 0.08) setObj(x, y, newObj({ type: 'tree', claimed: 0, v: R(), born: S.time })); } }
+      {
+        let trees = 0; for (const k in S.objs) if (S.objs[k].type === 'tree') trees++;
+        if (trees < 25 * al0.length) for (let a = 0; a < 4; a++) {
+          const p = pickReach(); if (!p) continue; const [x, y] = p, g = G(x, y);
+          if (g.k === 'grass' && !g.o && !g.d) { const nb = OB(G(x + 1, y)) || OB(G(x, y + 1)) || OB(G(x - 1, y)) || OB(G(x, y - 1)); if ((nb && nb.type === 'tree') || R() < 0.35) { setObj(x, y, newObj({ type: 'tree', claimed: 0, v: R(), born: S.time })); break; } }
+        }
       }
       if (R() < dt * 0.3) {
         let rocks = 0; for (const k in S.objs) if (S.objs[k].type === 'rock') rocks++;
