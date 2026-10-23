@@ -53,7 +53,7 @@
   const EFFECTS = { farm_growth: 'Åkrene gror raskere', work_speed: 'Alt arbeid går raskere', carry: 'Bærer mer per tur', walk: 'Går raskere', research: 'Forskning går raskere', build: 'Bygger raskere', food_save: 'Mindre matsvinn', pop_cap: 'Plass til flere innbyggere' };
   const ROOFS = ['flat', 'pointed', 'dome', 'none'];
   let S = null;
-  const TK = ['vill', 'sites', 'blds', 'storages', 'res', 'tech', 'inv', 'invInfo', 'defs', 'invq', 'goal', 'thoughts', 'islands', 'stats', 'nInv', 'growT', 'eatT', 'planT', 'scanT', 'drownT', 'reach', 'landReach', 'lastReach', 'noSpot', 'hungerDay', 'expLogged', 'cul', 'ethos', 'expT', 'hungry', 'cleanT', 'wondT'];
+  const TK = ['invFold', 'vill', 'sites', 'blds', 'storages', 'res', 'tech', 'inv', 'invInfo', 'defs', 'invq', 'goal', 'thoughts', 'islands', 'stats', 'nInv', 'growT', 'eatT', 'planT', 'scanT', 'drownT', 'reach', 'landReach', 'lastReach', 'noSpot', 'hungerDay', 'expLogged', 'cul', 'ethos', 'expT', 'hungry', 'cleanT', 'wondT'];
   const PAL = [[205, 72, 62], [66, 124, 214], [232, 172, 44], [92, 172, 94], [166, 96, 204], [44, 172, 172], [224, 114, 164], [146, 146, 156]];
   const TNAMES = ['Nordvik', 'Zhaoling', 'Kalahar', 'Ostmark', 'Mbali', 'Vesterhavn', 'Qianlu', 'Tarsis', 'Ravnholt', 'Solvang', 'Hanor', 'Umoja'];
   function use(c) { if (S.ct === c) return; if (S.ct) save(S.ct); for (const k of TK) S[k] = c[k]; S.ct = c; }
@@ -67,14 +67,17 @@
   }
   const defOf = (t) => DEF[t] || (S && S.defs && S.defs[t]);
   const techInfo = (k) => TECHS[k] || (S.invInfo && S.invInfo[k]);
-  const ECACHE = {};
+  const ECACHE = {}, PCACHE = {}, NCACHE = {};
   function effSums() {
-    const id = S.ct ? S.ct.id : 0, sig = S.nInv + ':' + S.blds.length, c = ECACHE[id];
+    const id = S.ct ? S.ct.id : 0, sig = S.nInv * 100000 + S.blds.length, c = ECACHE[id];
     if (c && c.sig === sig) return c.sums;
-    const sums = {}, cnt = {};
+    let base = c && c.nInv === S.nInv ? c.base : null;
+    if (!base) { base = {}; for (const key in S.inv) { if (S.defs[key]) continue; const i = S.invInfo[key]; if (i && i.effect) base[i.effect.type] = (base[i.effect.type] || 0) + i.effect.value; } }
+    const sums = Object.assign({}, base), cnt = {};
+    if (S.invFold) for (const t in S.invFold) sums[t] = (sums[t] || 0) + S.invFold[t];
     for (const bid of S.blds) { const o = S.objs[bid]; if (o) cnt[o.type] = (cnt[o.type] || 0) + 1; }
-    for (const key in S.inv) { const i = S.invInfo[key]; if (i && i.effect) sums[i.effect.type] = (sums[i.effect.type] || 0) + i.effect.value * (S.defs[key] ? Math.min(6, cnt[key] || 0) : 1); }
-    ECACHE[id] = { sig, sums };
+    for (const key in S.defs) { if (!S.inv[key]) continue; const i = S.invInfo[key]; if (i && i.effect) sums[i.effect.type] = (sums[i.effect.type] || 0) + i.effect.value * Math.min(6, cnt[key] || 0); }
+    ECACHE[id] = { sig, sums, base, nInv: S.nInv };
     return sums;
   }
   function eff(k) {
@@ -165,7 +168,7 @@
   }
   function create(seed) {
     for (const k in COOL) delete COOL[k];
-    for (const k in ECACHE) delete ECACHE[k]; for (const k in CNT) delete CNT[k];
+    for (const k in ECACHE) delete ECACHE[k]; for (const k in CNT) delete CNT[k]; for (const k in PCACHE) delete PCACHE[k]; for (const k in NCACHE) delete NCACHE[k];
     S = { v: 4, rs: seed | 0 || 1234567, time: 0, nid: 0, objs: {}, grid: [], log: [], vid: 0, lastDay: -1, nightLogged: false, ev: null, tribes: [], rel: {}, ct: null, deaths: 0 };
     genWorld();
     const c0 = newTribeCtx(0, TNAMES[0]); S.tribes.push(c0); use(c0);
@@ -186,7 +189,7 @@
   }
   function serialize() { return JSON.stringify(snapshot()); }
   function load(json) {
-    for (const k in ECACHE) delete ECACHE[k]; for (const k in CNT) delete CNT[k];
+    for (const k in ECACHE) delete ECACHE[k]; for (const k in CNT) delete CNT[k]; for (const k in PCACHE) delete PCACHE[k]; for (const k in NCACHE) delete NCACHE[k];
     S = typeof json === 'string' ? JSON.parse(json) : json;
     S.ev = null; S.ct = null;
     if (!S.tribes) { // migrate v3 single-village state
@@ -197,7 +200,7 @@
       S.v = 4;
     }
     if (!S.rel) S.rel = {};
-    for (const c of S.tribes) { c.reach = null; if (c.alive) { use(c); scan(); } }
+    for (const c of S.tribes) { c.reach = null; if (c.alive) { use(c); scan(); pruneInv(); } }
     use(S.tribes.find((c) => c.alive) || S.tribes[0]);
     return S;
   }
@@ -304,6 +307,7 @@
     if (era() < 3 || S.vill.length < 40 || count('house') < 12) return null;
     const lst = STYLES[(S.ct ? S.ct.id : 0) % 4], big = S.vill.length >= 120 ? 2 : 1;
     for (const k of lst) { const need = k === 'pagoda' ? 2 * big : big; if (count(k) < Math.min(need, k === 'pagoda' ? 3 : 2)) return k; }
+    if (S.vill.length >= 100) { const all = ['colosseum', 'pantheon', 'pagoda', 'palace', 'fortress', 'cathedral', 'pyramid']; for (const k of all) if (count(k) < 1) return k; for (const k of lst) if (count(k) < (k === 'pagoda' ? 4 : 3)) return k; }
     return null;
   }
   function nextType() {
@@ -325,8 +329,9 @@
     if (h >= 6 && count('park') < Math.ceil(h / 9)) return 'park';
     if (E >= 1 && h >= 14 && count('monument') < Math.ceil(h / 22)) return 'monument';
     if (E >= 2 && h >= 20 && count('lighthouse') < Math.ceil(h / 30)) return 'lighthouse';
-    if (h >= 8) for (const k in S.defs) if (INVB.has(S.defs[k].n) && count(k) < (h >= 40 ? 2 : 1)) return k;
-    if (p >= 8 && h >= 5) { let n = 0; for (const k in S.defs) { n += count(k); } if (n < 60) for (const k in S.defs) if (count(k) < Math.min(3, S.defs[k].max || 3)) return k; }
+    const nid = S.ct ? S.ct.id : 0; let nc = NCACHE[nid]; if (!nc || nc.sig !== S.nInv) { const ks = Object.keys(S.defs); nc = NCACHE[nid] = { sig: S.nInv, ks, bk: ks.filter((k) => INVB.has(S.defs[k].n)) }; }
+    if (h >= 8) for (const k of nc.bk) if (count(k) < (h >= 40 ? 2 : 1)) return k;
+    if (p >= 8 && h >= 5 && S.blds.length < 150) { let n = 0; for (const k of nc.ks) { n += count(k); } if (n < 60) for (const k of nc.ks) if (count(k) < Math.min(3, S.defs[k].max || 3)) return k; }
     return 'house';
   }
   function center() {
@@ -386,7 +391,7 @@
   function planner() {
     for (const id of S.sites.slice()) { const st = T(id); if (!st || st.done) continue; if (!st.born) st.born = S.time; if (st.prog === 0 && st.builders === 0 && S.time - st.born > 240) { const c = cost(st.what); for (const k in c) S.res[k] = Math.min(999, S.res[k] + Math.floor(c[k] * 0.8)); S.sites = S.sites.filter((x) => x !== id); dropObj(st); } }
     const open = openSites().length, pop = S.vill.length;
-    if (S.blds.length >= 230) {
+    if (S.blds.length >= 330) {
       // rydd bort overflødige kopier av enkle egne bygg for å gi plass til de flotte
       let junk = null, jc = 3; for (const id of S.blds) { const o = T(id); if (o && S.defs[o.type] && !INVB.has(S.defs[o.type].n) && count(o.type) > jc) { junk = o; jc = count(o.type); } }
       if (junk && S.vill.length > 30 && S.time - (S.cleanT || 0) > 20) { S.cleanT = S.time; destroyBld(junk); }
@@ -402,7 +407,7 @@
         }
       }
     }
-    if (S.blds.length >= 260) return;
+    if (S.blds.length >= 420) return;
     if (open >= (pop >= 12 ? 3 : pop >= 8 ? 2 : 1)) return;
     const t = nextType();
     if (afford(cost(t))) {
@@ -496,8 +501,9 @@
   const SUBJ = ['Fiskeredskap', 'Saltlake', 'Vevstol', 'Kompass', 'Tørkestativ', 'Vannhjul', 'Smie', 'Lysestøperi', 'Tauverk', 'Frøbank', 'Kalender', 'Skriftruller', 'Mosaikk', 'Trommespråk', 'Brenneovn', 'Kartpress', 'Skipsdokk', 'Hagebruk', 'Biavl', 'Glassblåsing', 'Gjæringskunst', 'Nattvakt', 'Teater', 'Observatorium'];
   const RN = ['', ' II', ' III', ' IV', ' V', ' VI', ' VII', ' VIII', ' IX', ' X'];
   function procInvention() {
-    const used = new Set(Object.values(S.invInfo).map((i) => i.n));
-    const have = new Set(Object.values(S.invInfo).map((i) => i.n).concat(Object.keys(S.tech.done).map((k) => TECHS[k].n)));
+    const id = S.ct ? S.ct.id : 0, psig = S.nInv + ':' + Object.keys(S.tech.done).length; let pc = PCACHE[id];
+    if (!pc || pc.sig !== psig) { const u = new Set(Object.values(S.invInfo).map((i) => i.n)); pc = PCACHE[id] = { sig: psig, used: u, have: new Set(u).add ? (() => { const h = new Set(u); for (const k of Object.keys(S.tech.done)) h.add(TECHS[k].n); return h; })() : u }; }
+    const used = pc.used, have = pc.have;
     const cand = INV.filter((x) => !used.has(x[0]) && x[1].every((q) => have.has(q)));
     if (cand.length) {
       const x = cand[Math.floor(R() * cand.length)], type = EFFECTS[x[2]] ? x[2] : 'work_speed', value = Math.round((0.08 + R() * 0.1) * 100) / 100;
@@ -525,12 +531,23 @@
     }
     return out;
   }
+  function pruneInv() {
+    if (!(S.nInv > 400 && Object.keys(S.inv).length > 400)) return;
+    const keys = Object.keys(S.inv).filter((k) => !S.defs[k]); keys.sort((a, b) => S.inv[a] - S.inv[b]); const F = S.invFold || (S.invFold = {});
+    for (const k of keys.slice(0, Math.max(0, keys.length - 200))) { const i = S.invInfo[k]; if (i && i.effect) F[i.effect.type] = (F[i.effect.type] || 0) + i.effect.value; delete S.inv[k]; delete S.invInfo[k]; }
+    const cn = {}; for (const id of S.blds) { const o = S.objs[id]; if (o) cn[o.type] = 1; } for (const id of S.sites) { const o = S.objs[id]; if (o) cn[o.what] = 1; }
+    const dk = Object.keys(S.defs).filter((k) => !cn[k] && !INVB.has(S.defs[k].n)).sort((a, b) => (S.inv[a] || 0) - (S.inv[b] || 0));
+    for (const k of dk.slice(0, Math.max(0, dk.length - 40))) { delete S.defs[k]; delete S.inv[k]; delete S.invInfo[k]; }
+    for (const k in ECACHE) delete ECACHE[k]; for (const k in PCACHE) delete PCACHE[k]; for (const k in NCACHE) delete NCACHE[k]; for (const k in CNT) delete CNT[k];
+  }
   function chooseResearch() {
     const a = availableTechs();
     if (a.length && (!S.invq.length || R() < 0.5)) { S.tech.cur = a[Math.floor(R() * a.length)]; S.tech.prog = Math.min(S.tech.prog, 0.5 * TECHS[S.tech.cur].cost); return; }
     const p = S.invq.length ? S.invq.shift() : procInvention();
+    pruneInv();
     const key = 'i' + S.ct.id + '_' + (++S.nInv);
-    S.invInfo[key] = Object.assign({}, p, { cost: Math.round(Math.min(40000, 1500 + S.nInv * 220)) });
+    S.invInfo[key] = Object.assign({}, p, { cost: Math.round(Math.min(400000, 1500 + S.nInv * 1500)) });
+    const pc = PCACHE[S.ct.id]; if (pc && p.n) { pc.used.add(p.n); pc.have.add(p.n); pc.sig = S.nInv + ':' + Object.keys(S.tech.done).length; }
     S.tech.cur = key; S.tech.prog = Math.min(S.tech.prog, 0.3 * S.invInfo[key].cost);
   }
   function addKnowledge(v, amt) {
@@ -915,8 +932,8 @@
     S.planT -= dt; if (S.planT <= 0) { S.planT = 2; planner(); }
     S.scanT -= dt; if (S.scanT <= 0) { S.scanT = hasTech('cartog') ? 10 : 20; scan(); }
     S.growT += dt;
-    if (S.vill.length > 170) for (let k = 0; k < 8 && S.vill.length > 160; k++) die(S.vill[S.vill.length - 1], 'dro på langferd');
-    if (S.growT >= (hasTech('harvest') ? 30 : 45)) { S.growT = 0; if (S.res.food >= 8 && S.vill.length < cap() && S.vill.length < 160) { const f = S.storages.map(T).find(Boolean); if (f) { addVillager(f.x, f.y + 2); if (S.vill.length % 5 === 0) log('Folket har nå ' + S.vill.length + ' innbyggere.'); } } }
+    if (S.vill.length > 260) for (let k = 0; k < 8 && S.vill.length > 240; k++) die(S.vill[S.vill.length - 1], 'dro på langferd');
+    if (S.growT >= (hasTech('harvest') ? 30 : 45)) { S.growT = 0; if (S.res.food >= 8 && S.vill.length < cap() && S.vill.length < 240) { const f = S.storages.map(T).find(Boolean); if (f) { addVillager(f.x, f.y + 2); if (S.vill.length % 5 === 0) log('Folket har nå ' + S.vill.length + ' innbyggere.'); } } }
     S.eatT += dt;
     if (S.eatT >= 60) {
       S.eatT = 0; S.res.food = Math.max(0, S.res.food - Math.ceil(S.vill.length * (hasTech('medicine') ? 0.45 : 0.6) / eff('food_save')));
@@ -968,6 +985,6 @@
     trim, GW, GH, DAYLEN, DT, DEF, TECHS, NB4, EFFECTS,
     get S() { return S; },
     create, load, serialize, snapshot, step, advance, scan,
-    helpers: { eraOf, era, defOf, eff, techInfo, applyCouncil, summary, sanitize, withT, ctxById, relOf, trait2label, G, OB, T, elev, phase, light, cap, hasTech, lvl, houses, count, nextType, availableTechs, tile, walkable }
+    helpers: { wonderNext, wonderSpot, eraOf, era, defOf, eff, techInfo, applyCouncil, summary, sanitize, withT, ctxById, relOf, trait2label, G, OB, T, elev, phase, light, cap, hasTech, lvl, houses, count, nextType, availableTechs, tile, walkable }
   };
 });

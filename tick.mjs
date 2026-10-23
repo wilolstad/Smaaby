@@ -18,7 +18,7 @@ if (raw) {
   Sim.load(raw.state);
   const elapsed = Math.min(MAX_CATCHUP, Math.max(0, ((now - (meta.savedAt || now)) / 1000) * SCALE));
   console.log(`Fast-forwarding ${elapsed.toFixed(0)} s of village life`);
-  Sim.trim(160);
+  Sim.trim(260);
   const t0 = Date.now(); let done = 0;
   while (done < elapsed && Date.now() - t0 < 110000) { const d = Math.min(30, elapsed - done); Sim.advance(d); done += d; }
   if (done < elapsed) { console.log(`Behind: ${(elapsed - done).toFixed(0)} s left`); meta.lag = ((elapsed - done) / SCALE) * 1000; } else meta.lag = 0;
