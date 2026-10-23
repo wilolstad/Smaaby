@@ -20,7 +20,7 @@ if (raw) {
   console.log(`Fast-forwarding ${elapsed.toFixed(0)} s of village life`);
   Sim.trim(100);
   const t0 = Date.now(); let done = 0;
-  while (done < elapsed && Date.now() - t0 < 45000) { const d = Math.min(30, elapsed - done); Sim.advance(d); done += d; }
+  while (done < elapsed && Date.now() - t0 < 110000) { const d = Math.min(30, elapsed - done); Sim.advance(d); done += d; }
   if (done < elapsed) { console.log(`Behind: ${(elapsed - done).toFixed(0)} s left`); meta.lag = ((elapsed - done) / SCALE) * 1000; } else meta.lag = 0;
   try {
     const H = Sim.helpers, S0 = Sim.S;
