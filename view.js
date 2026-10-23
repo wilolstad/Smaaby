@@ -62,7 +62,61 @@ function drawSpecial(n,b,x,y,e,age,night){
  case 'Veveri':case 'Trykkeri':case 'Smie':case 'Vannmølle':case 'Bikuber':case 'Fjøs':case 'Badehus':case 'Bryggeri':case 'Postkontor':case 'Vaktstue':case 'Bymur':case 'Saltverk':case 'Keramikkovn':case 'Glasshytte':case 'Radiomast':return false;
  default:return false}
  return true}
+
+// ---- storslagne byggverk (flere ruter): Roma, Kina, borg, katedral, pyramide
+const WON={colosseum:1,pantheon:1,pagoda:1,palace:1,fortress:1,cathedral:1,pyramid:1};
+function pyr(x0,y0,x1,y1,z,apex,c){const A=iso(x0,y0,z),B=iso(x1,y0,z),C=iso(x1,y1,z),D=iso(x0,y1,z),P=iso((x0+x1)/2,(y0+y1)/2,z+apex);tri(D,C,P,rgb(c,.85));tri(C,B,P,rgb(c,.66));tri(B,A,P,rgb(c,.95));tri(A,D,P,rgb(c,.75))}
+function archRow(x0,y0,x1,y1,z0,z1,n,col){for(let i=0;i<n;i++){const u0=(i+.22)/n,u1=(i+.78)/n;face('L',x0,y0,x1,y1,u0,u1,z0,z1,col);face('R',x0,y0,x1,y1,u0,u1,z0,z1,col)}}
+function dome(cx,cy,z,r,col,hh){const p=iso(cx,cy,z),dx=Math.abs(iso(cx+1,cy,z)[0]-iso(cx,cy,z)[0]),rx=r*dx*1.42;ctx.fillStyle=rgb(col,.95);ctx.beginPath();ctx.ellipse(p[0],p[1],rx,rx*(hh||.9),0,Math.PI,0);ctx.fill();ctx.fillStyle=rgb(col,.72);ctx.beginPath();ctx.ellipse(p[0],p[1],rx,rx*.5,0,0,Math.PI);ctx.fill()}
+function flag(cx,cy,z,col){const p=iso(cx,cy,z);ctx.fillStyle='#d8d8d8';ctx.fillRect(p[0]-.5,p[1]-14,1.5,14);ctx.fillStyle=rgb(col,1);ctx.beginPath();ctx.moveTo(p[0]+1,p[1]-14);ctx.lineTo(p[0]+11,p[1]-11);ctx.lineTo(p[0]+1,p[1]-8);ctx.fill()}
+function drawWonder(b,x,y,g){
+ const e=g.h,ox=b.x,oy=b.y,sz=b.size,age=clamp((S.time-(b.t0||0))/3,0,1),night=1-light,tc=TM[b.tribe]?TM[b.tribe].color:[200,60,50];
+ const W=night>.4?'#ffd27a':'#2c3148',dk='#2a2420',lamp=(cx,cy,z,r)=>{if(night>.4)lights.push([...iso(cx,cy,e+z),r,[255,205,120],.85])};
+ const X1=ox+sz,Y1=oy+sz;
+ switch(b.type){
+ case 'colosseum':{
+  for(let t=0;t<3;t++){const ins=.06+t*.1,z0=e+t*2.1*age,z1=e+(t+1)*2.1*age,c=t===1?[222,202,160]:[232,214,176];block(ox+ins,oy+ins,X1-ins,Y1-ins,z0,z1,c,.86,.66,1.03);archRow(ox+ins,oy+ins,X1-ins,Y1-ins,z0+.3,z1-.35,t===2?9:8,'#4a3a2e')}
+  block(ox+.55,oy+.55,X1-.55,Y1-.55,e+6.3*age,e+6.34*age,[206,176,124],.9,.7,1.02);block(ox+.12,oy+.12,X1-.12,Y1-.12,e+6.3*age,e+6.6*age,[210,194,156],.8,.62,1);
+  for(const [u,w] of [[.2,.2],[2.5,.2],[.2,2.5],[2.5,2.5]])lamp(ox+u,oy+w,5,90);break}
+ case 'pantheon':{
+  block(ox,oy,X1,Y1,e,e+.45*age,[214,212,206],.9,.72,1);
+  block(ox+.5,oy+.5,X1-.5,Y1-.5,e+.45*age,e+3.6*age,[226,220,204],.86,.68,1.02);
+  for(let i=0;i<6;i++){const cx=ox+.35+i*.46;block(cx,Y1-.42,cx+.18,Y1-.24,e+.45*age,e+3.2*age,[244,240,230],.9,.74,1.02)}
+  block(ox+.3,Y1-.55,X1-.3,Y1-.2,e+3.2*age,e+3.6*age,[236,230,216],.88,.7,1);pyr(ox+.3,Y1-.6,X1-.3,Y1-.15,e+3.6*age,.7*age,[196,170,130]);
+  dome(ox+sz/2-.1,oy+sz/2-.2,e+3.6*age,1.15,[212,206,196],.95);const p=iso(ox+sz/2-.1,oy+sz/2-.2,e+3.6*age);ctx.fillStyle='#1a1a22';ctx.beginPath();ctx.ellipse(p[0],p[1]-18,3,1.6,0,0,6.3);ctx.fill();lamp(ox+1.5,oy+1.5,3,110);break}
+ case 'pagoda':{
+  block(ox+.1,oy+.1,X1-.1,Y1-.1,e,e+.4*age,[186,180,170],.9,.72,1);
+  for(let t=0;t<5;t++){const bi=.5+t*.08,ri=.12+t*.1,z0=e+.4*age+t*1.35*age,z1=z0+1*age;
+   block(ox+bi,oy+bi,X1-bi,Y1-bi,z0,z1,[186,48,42],.84,.66,1.02);face('L',ox+bi,oy+bi,X1-bi,Y1-bi,.3,.7,z0+.2,z1-.2,W);
+   block(ox+ri,oy+ri,X1-ri,Y1-ri,z1,z1+.18*age,[84,128,110],.86,.68,1);pyr(ox+ri-.05,oy+ri-.05,X1-ri+.05,Y1-ri+.05,z1+.18*age,.42*age,[56,112,96])}
+  const top=e+.4*age+5*1.35*age+.5;const p=iso(ox+1,oy+1,top);ctx.fillStyle='#e8c040';ctx.fillRect(p[0]-1,p[1]-12,2,12);ctx.beginPath();ctx.arc(p[0],p[1]-12,3,0,6.3);ctx.fill();lamp(ox+1,oy+1,4,90);break}
+ case 'palace':{
+  block(ox,oy,X1,Y1,e,e+.7*age,[236,232,224],.9,.72,1);block(ox+.12,oy+.12,X1-.12,Y1-.12,e+.7*age,e+.85*age,[222,216,206],.88,.7,1);
+  block(ox+.35,oy+.5,X1-.35,Y1-.5,e+.85*age,e+2.7*age,[178,38,38],.84,.66,1.02);
+  for(let i=0;i<6;i++){const cx=ox+.5+i*.37;block(cx,Y1-.58,cx+.12,Y1-.46,e+.85*age,e+2.6*age,[140,28,28],.9,.74,1)}
+  face('L',ox+.35,oy+.5,X1-.35,Y1-.5,.42,.58,e+.85*age,e+2*age,'#3a1612');
+  block(ox+.1,oy+.25,X1-.1,Y1-.25,e+2.7*age,e+2.95*age,[224,176,52],.88,.7,1.02);pyr(ox+.05,oy+.2,X1-.05,Y1-.2,e+2.95*age,1.1*age,[226,178,50]);
+  block(ox+.9,oy+.9,X1-.9,Y1-.9,e+4*age,e+5.1*age,[178,38,38],.84,.66,1.02);block(ox+.7,oy+.7,X1-.7,Y1-.7,e+5.1*age,e+5.3*age,[224,176,52],.88,.7,1);pyr(ox+.65,oy+.65,X1-.65,Y1-.65,e+5.3*age,1.2*age,[230,184,56]);
+  block(ox+.85,oy+.85,X1-.85,Y1-.85,e+2.95*age,e+4*age,[178,38,38],.84,.66,1);lamp(ox+1.5,oy+1.5,4,130);break}
+ case 'fortress':{
+  const wc=[150,152,160];block(ox+.06,oy+.06,X1-.06,Y1-.06,e,e+2.3*age,wc,.84,.66,1.02);block(ox+.45,oy+.45,X1-.45,Y1-.45,e+2.3*age,e+2.32*age,[110,114,122],.9,.7,1);
+  face('L',ox+.06,oy+.06,X1-.06,Y1-.06,.42,.58,e,e+1.5*age,dk);
+  for(const [u,w] of [[0,0],[sz-.85,0],[0,sz-.85],[sz-.85,sz-.85]]){block(ox+u,oy+w,ox+u+.85,oy+w+.85,e,e+4.2*age,[170,172,182],.84,.66,1.03);block(ox+u-.04,oy+w-.04,ox+u+.89,oy+w+.89,e+4.2*age,e+4.5*age,[150,152,162],.8,.62,1);pyr(ox+u,oy+w,ox+u+.85,oy+w+.85,e+4.5*age,1.3*age,[168,52,52])}
+  block(ox+1,oy+1,X1-1,Y1-1,e+2.3*age,e+5.6*age,[176,178,188],.84,.66,1.02);block(ox+.9,oy+.9,X1-.9,Y1-.9,e+5.6*age,e+5.9*age,[154,156,166],.8,.62,1);pyr(ox+.95,oy+.95,X1-.95,Y1-.95,e+5.9*age,1.6*age,[176,50,50]);
+  if(age>.99)flag(ox+sz/2,oy+sz/2,e+7.4,tc);lamp(ox+1.5,oy+2.4,2,100);break}
+ case 'cathedral':{
+  block(ox+.2,oy+.7,X1-.2,Y1-.7,e,e+3*age,[216,212,204],.86,.68,1.02);pyr(ox+.15,oy+.65,X1-.15,Y1-.65,e+3*age,1.3*age,[96,104,126]);
+  for(let i=0;i<5;i++)face('L',ox+.2,oy+.7,X1-.2,Y1-.7,.1+i*.18,.2+i*.18,e+.7*age,e+2.5*age,night>.4?'#ffd27a':'#7a8cc8');
+  for(const u of [.2,sz-1]){block(ox+u,Y1-1,ox+u+.8,Y1-.2,e,e+6.4*age,[206,202,194],.86,.68,1.03);block(ox+u+.05,Y1-.95,ox+u+.75,Y1-.25,e+6.4*age,e+6.7*age,[190,186,178],.8,.62,1);pyr(ox+u+.08,Y1-.92,ox+u+.72,Y1-.28,e+6.7*age,3.2*age,[92,100,124]);face('L',ox+u,Y1-1,ox+u+.8,Y1-.2,.3,.7,e+2*age,e+4*age,W)}
+  const p=iso(ox+sz/2,Y1-.2,e+3*age);ctx.fillStyle=night>.4?'#ffd27a':'#c04a58';ctx.beginPath();ctx.arc(p[0],p[1],5,0,6.3);ctx.fill();lamp(ox+1.5,oy+2.2,3,120);break}
+ case 'pyramid':{
+  for(let t=0;t<6;t++){const ins=t*.22,z0=e+t*.85*age,z1=z0+.85*age;block(ox+ins,oy+ins,X1-ins,Y1-ins,z0,z1,t%2?[214,184,120]:[226,198,134],.86,.66,1.02)}
+  const top=e+6*.85*age;pyr(ox+1.32,oy+1.32,X1-1.32,Y1-1.32,top,.55*age,[236,196,60]);
+  face('L',ox+1.2,oy+0,X1-1.2,Y1,.4,.6,e,e+.9*age,dk);lamp(ox+1.5,oy+1.5,3,90);break}
+ }
+}
 function drawBuilding(b,x,y,g){
+ if(WON[b.type]){if(x===b.x+b.size-1&&y===b.y+b.size-1)drawWonder(b,x,y,g);return}
  const e=g.h,age=clamp((S.time-(b.t0||0))/1.2,0,1),night=1-light;
  switch(b.type){
  case 'house':{const E=eraOf(TM[b.tribe]),id=b.id|0,fl=Math.min(4,1+Math.min(E,2)+(id%3===0?1:0)),hh=(1.6+.9*fl)*age,P=[[222,196,150],[214,170,140],[200,204,190],[226,216,184],[190,176,200]],wc=E>=2&&id%2?[196,192,186]:P[id%P.length],tc=TM[b.tribe]?TM[b.tribe].color:[190,76,60],rc=tc.map((c,i)=>Math.max(30,Math.min(245,c+((id*(i+3))%41)-20)));bk(x,y,.1,e,e+hh,wc,.84,.66,1.04);for(let f=0;f<fl;f++)face('L',x+.1,y+.1,x+.9,y+.9,.3,.62,e+.7+f*.9,e+1.3+f*.9,night>.4?'#ffd27a':rgb([70,90,120],1));face('R',x+.1,y+.1,x+.9,y+.9,.33,.67,e,e+1.3,rgb([108,70,44],1));if(id%4===1)bk(x,y,.62-.0,e+hh,e+hh+.9,[120,100,90],.3,.3,1);roof(x,y,e+hh,0,(1.2+(id%3)*.4)*age,rc);if(night>.4)lights.push([...iso(x+.4,y+.9,e+1.3),70+fl*8,[255,200,110],.8]);break}

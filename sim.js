@@ -20,6 +20,13 @@
     bridge: { n: 'Bro', cost: { wood: 3 }, time: 7, size: 1 },
     market: { n: 'Marked', cost: { wood: 20, stone: 20 }, time: 34, size: 1 },
     temple: { n: 'Tempel', cost: { stone: 45, wood: 10 }, time: 44, size: 1 },
+    colosseum: { n: 'Colosseum', cost: { stone: 320, wood: 60 }, time: 170, size: 3 },
+    pantheon: { n: 'Pantheon', cost: { stone: 260, wood: 40 }, time: 150, size: 3 },
+    pagoda: { n: 'Pagode', cost: { stone: 140, wood: 100 }, time: 110, size: 2 },
+    palace: { n: 'Keiserpalass', cost: { stone: 260, wood: 120 }, time: 170, size: 3 },
+    fortress: { n: 'Borg', cost: { stone: 300, wood: 80 }, time: 170, size: 3 },
+    cathedral: { n: 'Katedral', cost: { stone: 300, wood: 60 }, time: 170, size: 3 },
+    pyramid: { n: 'Pyramide', cost: { stone: 380 }, time: 170, size: 3 },
     park: { n: 'Park', cost: { stone: 10, wood: 4 }, time: 18, size: 1 },
     monument: { n: 'Monument', cost: { stone: 70 }, time: 40, size: 1 },
     lighthouse: { n: 'Fyrtårn', cost: { stone: 50, wood: 10 }, time: 36, size: 1 },
@@ -46,7 +53,7 @@
   const EFFECTS = { farm_growth: 'Åkrene gror raskere', work_speed: 'Alt arbeid går raskere', carry: 'Bærer mer per tur', walk: 'Går raskere', research: 'Forskning går raskere', build: 'Bygger raskere', food_save: 'Mindre matsvinn', pop_cap: 'Plass til flere innbyggere' };
   const ROOFS = ['flat', 'pointed', 'dome', 'none'];
   let S = null;
-  const TK = ['vill', 'sites', 'blds', 'storages', 'res', 'tech', 'inv', 'invInfo', 'defs', 'invq', 'goal', 'thoughts', 'islands', 'stats', 'nInv', 'growT', 'eatT', 'planT', 'scanT', 'drownT', 'reach', 'landReach', 'lastReach', 'noSpot', 'hungerDay', 'expLogged', 'cul', 'ethos', 'expT', 'hungry', 'cleanT'];
+  const TK = ['vill', 'sites', 'blds', 'storages', 'res', 'tech', 'inv', 'invInfo', 'defs', 'invq', 'goal', 'thoughts', 'islands', 'stats', 'nInv', 'growT', 'eatT', 'planT', 'scanT', 'drownT', 'reach', 'landReach', 'lastReach', 'noSpot', 'hungerDay', 'expLogged', 'cul', 'ethos', 'expT', 'hungry', 'cleanT', 'wondT'];
   const PAL = [[205, 72, 62], [66, 124, 214], [232, 172, 44], [92, 172, 94], [166, 96, 204], [44, 172, 172], [224, 114, 164], [146, 146, 156]];
   const TNAMES = ['Nordvik', 'Zhaoling', 'Kalahar', 'Ostmark', 'Mbali', 'Vesterhavn', 'Qianlu', 'Tarsis', 'Ravnholt', 'Solvang', 'Hanor', 'Umoja'];
   function use(c) { if (S.ct === c) return; if (S.ct) save(S.ct); for (const k of TK) S[k] = c[k]; S.ct = c; }
@@ -291,6 +298,14 @@
   const adj = (x, y, fn) => { for (const [dx, dy] of NB4) { const o = OB(G(x + dx, y + dy)); if (o) { const r = fn(o); if (r) return r; } } return null; };
 
   // ---------- economy planning
+  const STYLES = [['colosseum', 'pantheon', 'fortress', 'pagoda'], ['pagoda', 'palace', 'fortress', 'pagoda'], ['fortress', 'cathedral', 'palace', 'colosseum'], ['pyramid', 'pagoda', 'pantheon', 'cathedral']];
+  const WONDERS = new Set(['colosseum', 'pantheon', 'pagoda', 'palace', 'fortress', 'cathedral', 'pyramid']);
+  function wonderNext() {
+    if (era() < 3 || S.vill.length < 40 || count('house') < 12) return null;
+    const lst = STYLES[(S.ct ? S.ct.id : 0) % 4], big = S.vill.length >= 120 ? 2 : 1;
+    for (const k of lst) { const need = k === 'pagoda' ? 2 * big : big; if (count(k) < Math.min(need, k === 'pagoda' ? 3 : 2)) return k; }
+    return null;
+  }
   function nextType() {
     const h = count('house'), f = count('farm'), p = S.vill.length, c = cap();
     const E = era();
@@ -350,6 +365,23 @@
     return site;
   }
   function openSites() { return S.sites.filter((id) => T(id) && !T(id).done); }
+  const CLEAR = new Set(['tree', 'rock', 'bush', 'farm', 'house', 'park', 'mill', 'well']);
+  function wonderSpot(type) {
+    const sz = defOf(type).size, [cx, cy] = center(); let best = null, bs = 1e9;
+    for (let y = 2; y < GH - 3 - sz; y++) for (let x = 2; x < GW - 3 - sz; x++) {
+      const d = Math.hypot(x + sz / 2 - cx, y + sz / 2 - cy); if (d > 36) continue;
+      const g0 = G(x, y); if (!g0 || (g0.k !== 'grass' && g0.k !== 'sand')) continue;
+      let ok = true, pen = 0; const seen = new Set();
+      for (let j = 0; j < sz && ok; j++) for (let i = 0; i < sz; i++) {
+        const g = G(x + i, y + j);
+        if (!g || (g.k !== 'grass' && g.k !== 'sand') || g.h !== g0.h || !S.reach[(y + j) * GW + x + i]) { ok = false; break; }
+        const o = OB(g); if (o) { if (o.tribe !== undefined && o.tribe !== S.ct.id && !(o.type === 'tree' || o.type === 'rock' || o.type === 'bush')) { ok = false; break; } if (!(CLEAR.has(o.type) || (S.defs[o.type] && !INVB.has(S.defs[o.type].n)))) { ok = false; break; } if (!seen.has(o.id)) { seen.add(o.id); pen += o.type === 'tree' || o.type === 'rock' || o.type === 'bush' ? 1 : 6; } }
+      }
+      if (!ok) continue;
+      const sc = pen + d * 0.8 + R(); if (sc < bs) { bs = sc; best = [x, y, seen]; }
+    }
+    return best;
+  }
   function planner() {
     for (const id of S.sites.slice()) { const st = T(id); if (!st || st.done) continue; if (!st.born) st.born = S.time; if (st.prog === 0 && st.builders === 0 && S.time - st.born > 240) { const c = cost(st.what); for (const k in c) S.res[k] = Math.min(999, S.res[k] + Math.floor(c[k] * 0.8)); S.sites = S.sites.filter((x) => x !== id); dropObj(st); } }
     const open = openSites().length, pop = S.vill.length;
@@ -357,6 +389,17 @@
       // rydd bort overflødige kopier av enkle egne bygg for å gi plass til de flotte
       let junk = null, jc = 3; for (const id of S.blds) { const o = T(id); if (o && S.defs[o.type] && !INVB.has(S.defs[o.type].n) && count(o.type) > jc) { junk = o; jc = count(o.type); } }
       if (junk && S.vill.length > 30 && S.time - (S.cleanT || 0) > 20) { S.cleanT = S.time; destroyBld(junk); }
+    }
+    if (S.time - (S.wondT || 0) > 12 && open < 3) {
+      const wt = wonderNext();
+      if (wt && afford(cost(wt))) {
+        S.wondT = S.time;
+        const sp = wonderSpot(wt);
+        if (sp) {
+          for (const id of sp[2]) { const o = T(id); if (!o) continue; if (o.type === 'tree' || o.type === 'rock' || o.type === 'bush') dropObj(o); else destroyBld(o); }
+          makeSite(wt, sp[0], sp[1]); log('Byggeplass: ' + defOf(wt).n.toLowerCase() + '!'); return;
+        }
+      }
     }
     if (S.blds.length >= 260) return;
     if (open >= (pop >= 12 ? 3 : pop >= 8 ? 2 : 1)) return;
