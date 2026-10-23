@@ -17,7 +17,10 @@
     library: { n: 'Bibliotek', cost: { wood: 12, stone: 8 }, time: 26, size: 1 },
     mill: { n: 'Vindmølle', cost: { wood: 14, stone: 6 }, time: 28, size: 1 },
     landfill: { n: 'Landfylling', cost: { stone: 3 }, time: 10, size: 1 },
-    bridge: { n: 'Bro', cost: { wood: 3 }, time: 7, size: 1 }
+    bridge: { n: 'Bro', cost: { wood: 3 }, time: 7, size: 1 },
+    market: { n: 'Marked', cost: { wood: 20, stone: 20 }, time: 34, size: 1 },
+    temple: { n: 'Tempel', cost: { stone: 45, wood: 10 }, time: 44, size: 1 },
+    castle: { n: 'Slott', cost: { stone: 110, wood: 40 }, time: 70, size: 1 }
   };
   const TECHS = {
     tools: { n: 'Bedre verktøy', cost: 150, req: [], d: 'Alt arbeid går 25 % raskere' },
@@ -58,8 +61,10 @@
     let s = 0, m = 1;
     if (S.ct) { const c = S.cul; if (k === 'research') m = c.sci; else if (k === 'build') m = c.build; else if (k === 'farm_growth') m = c.farm; else if (k === 'work_speed') m = c.ind; }
     for (const key in S.inv) { const i = S.invInfo[key]; if (i && i.effect && i.effect.type === k) s += i.effect.value * (S.defs[key] ? Math.min(6, S.blds.filter((id) => S.objs[id] && S.objs[id].type === key).length) : 1); }
-    return (1 + s) * m;
+    return Math.min(k === 'pop_cap' ? 1.6 : 6, 1 + s) * m;
   }
+  const eraOf = (n, t) => { n += t; return n >= 700 ? 4 : n >= 300 ? 3 : n >= 100 ? 2 : n >= 25 ? 1 : 0; };
+  const era = () => eraOf(S.nInv, Object.keys(S.tech.done).length);
 
   // ---------- deterministic rng stored in state
   function R() {
@@ -275,6 +280,10 @@
     if (count('store') < Math.max(1, Math.ceil(h / 10)) && h >= 4) return 'store';
     if (count('tower') < Math.max(1, Math.ceil(h / 14)) && h >= 6) return 'tower';
     if (count('plaza') < Math.max(1, Math.ceil(h / 16)) && h >= 8) return 'plaza';
+    const E = era();
+    if (E >= 1 && h >= 10 && count('market') < Math.ceil(h / 12)) return 'market';
+    if (E >= 2 && h >= 14 && count('temple') < Math.ceil(h / 16)) return 'temple';
+    if (E >= 3 && h >= 18 && count('castle') < Math.ceil(h / 24)) return 'castle';
     if (hasTech('windmill') && count('mill') < Math.floor(f / 3)) return 'mill';
     if (p >= 8) for (const k in S.defs) if (count(k) < Math.max(S.defs[k].max, Math.ceil(h / 6)) && h >= 5) return k;
     return 'house';
@@ -830,6 +839,6 @@
     GW, GH, DAYLEN, DT, DEF, TECHS, NB4, EFFECTS,
     get S() { return S; },
     create, load, serialize, snapshot, step, advance, scan,
-    helpers: { defOf, eff, techInfo, applyCouncil, summary, sanitize, withT, ctxById, relOf, trait2label, G, OB, T, elev, phase, light, cap, hasTech, lvl, houses, count, nextType, availableTechs, tile, walkable }
+    helpers: { eraOf, era, defOf, eff, techInfo, applyCouncil, summary, sanitize, withT, ctxById, relOf, trait2label, G, OB, T, elev, phase, light, cap, hasTech, lvl, houses, count, nextType, availableTechs, tile, walkable }
   };
 });
