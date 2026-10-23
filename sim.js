@@ -46,7 +46,7 @@
   const EFFECTS = { farm_growth: 'Åkrene gror raskere', work_speed: 'Alt arbeid går raskere', carry: 'Bærer mer per tur', walk: 'Går raskere', research: 'Forskning går raskere', build: 'Bygger raskere', food_save: 'Mindre matsvinn', pop_cap: 'Plass til flere innbyggere' };
   const ROOFS = ['flat', 'pointed', 'dome', 'none'];
   let S = null;
-  const TK = ['vill', 'sites', 'blds', 'storages', 'res', 'tech', 'inv', 'invInfo', 'defs', 'invq', 'goal', 'thoughts', 'islands', 'stats', 'nInv', 'growT', 'eatT', 'planT', 'scanT', 'drownT', 'reach', 'landReach', 'lastReach', 'noSpot', 'hungerDay', 'expLogged', 'cul', 'ethos', 'expT', 'hungry'];
+  const TK = ['vill', 'sites', 'blds', 'storages', 'res', 'tech', 'inv', 'invInfo', 'defs', 'invq', 'goal', 'thoughts', 'islands', 'stats', 'nInv', 'growT', 'eatT', 'planT', 'scanT', 'drownT', 'reach', 'landReach', 'lastReach', 'noSpot', 'hungerDay', 'expLogged', 'cul', 'ethos', 'expT', 'hungry', 'cleanT'];
   const PAL = [[205, 72, 62], [66, 124, 214], [232, 172, 44], [92, 172, 94], [166, 96, 204], [44, 172, 172], [224, 114, 164], [146, 146, 156]];
   const TNAMES = ['Nordvik', 'Zhaoling', 'Kalahar', 'Ostmark', 'Mbali', 'Vesterhavn', 'Qianlu', 'Tarsis', 'Ravnholt', 'Solvang', 'Hanor', 'Umoja'];
   function use(c) { if (S.ct === c) return; if (S.ct) save(S.ct); for (const k of TK) S[k] = c[k]; S.ct = c; }
@@ -310,6 +310,7 @@
     if (h >= 6 && count('park') < Math.ceil(h / 9)) return 'park';
     if (E >= 1 && h >= 14 && count('monument') < Math.ceil(h / 22)) return 'monument';
     if (E >= 2 && h >= 20 && count('lighthouse') < Math.ceil(h / 30)) return 'lighthouse';
+    if (h >= 8) for (const k in S.defs) if (INVB.has(S.defs[k].n) && count(k) < (h >= 40 ? 2 : 1)) return k;
     if (p >= 8 && h >= 5) { let n = 0; for (const k in S.defs) { n += count(k); } if (n < 60) for (const k in S.defs) if (count(k) < Math.min(3, S.defs[k].max || 3)) return k; }
     return 'house';
   }
@@ -352,6 +353,11 @@
   function planner() {
     for (const id of S.sites.slice()) { const st = T(id); if (!st || st.done) continue; if (!st.born) st.born = S.time; if (st.prog === 0 && st.builders === 0 && S.time - st.born > 240) { const c = cost(st.what); for (const k in c) S.res[k] = Math.min(999, S.res[k] + Math.floor(c[k] * 0.8)); S.sites = S.sites.filter((x) => x !== id); dropObj(st); } }
     const open = openSites().length, pop = S.vill.length;
+    if (S.blds.length >= 230) {
+      // rydd bort overflødige kopier av enkle egne bygg for å gi plass til de flotte
+      let junk = null, jc = 3; for (const id of S.blds) { const o = T(id); if (o && S.defs[o.type] && !INVB.has(S.defs[o.type].n) && count(o.type) > jc) { junk = o; jc = count(o.type); } }
+      if (junk && S.vill.length > 30 && S.time - (S.cleanT || 0) > 20) { S.cleanT = S.time; destroyBld(junk); }
+    }
     if (S.blds.length >= 260) return;
     if (open >= (pop >= 12 ? 3 : pop >= 8 ? 2 : 1)) return;
     const t = nextType();
@@ -442,6 +448,7 @@
     ['Flyging', ['Elektrisitet', 'Observatorium'], 'walk', B('Flyplass', [140, 150, 160], 2, 'flat')], ['Radio', ['Elektrisitet', 'Postvesen'], 'research', B('Radiomast', [180, 180, 190], 6, 'pointed')], ['Datamaskiner', ['Radio', 'Universitet'], 'research', B('Datasenter', [90, 110, 140], 3.5, 'flat')], ['Kunstig intelligens', ['Datamaskiner'], 'research'], ['Romfart', ['Flyging', 'Datamaskiner'], 'research', B('Romhavn', [220, 220, 235], 7, 'pointed')],
     ['Solceller', ['Elektrisitet', 'Glassblåsing'], 'work_speed', B('Solkraftverk', [60, 90, 150], 1.8, 'flat')], ['Hydroponikk', ['Solceller', 'Hagebruk'], 'farm_growth', B('Drivhus', [170, 220, 200], 2.4, 'dome')], ['Genforskning', ['Vaksiner', 'Datamaskiner'], 'farm_growth']
   ];
+  const INVB = new Set(INV.filter((x) => x[3]).map((x) => x[3].n));
   const SUBJ = ['Fiskeredskap', 'Saltlake', 'Vevstol', 'Kompass', 'Tørkestativ', 'Vannhjul', 'Smie', 'Lysestøperi', 'Tauverk', 'Frøbank', 'Kalender', 'Skriftruller', 'Mosaikk', 'Trommespråk', 'Brenneovn', 'Kartpress', 'Skipsdokk', 'Hagebruk', 'Biavl', 'Glassblåsing', 'Gjæringskunst', 'Nattvakt', 'Teater', 'Observatorium'];
   const RN = ['', ' II', ' III', ' IV', ' V', ' VI', ' VII', ' VIII', ' IX', ' X'];
   function procInvention() {
