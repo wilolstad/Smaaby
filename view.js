@@ -205,21 +205,22 @@ const STATE_URL=(function(){const m=location.hostname.match(/^([^.]+)\.github\.i
 let last=performance.now(),hudT=0;
 function loop(now){
  const dt=Math.min(.1,(now-last)/1000);last=now;
- if(!paused){let rem=dt*speed;try{while(rem>0){const s=Math.min(rem>.6?.5:.1,rem);Sim.step(s);rem-=s}}catch(e){console.error(e)}drainEv();stepFx(dt)}
+ if(!paused){let rem=dt*speed;try{const t0=performance.now();while(rem>0&&performance.now()-t0<9){const s=Math.min(rem>.6?.5:.1,rem);Sim.step(s);rem-=s}}catch(e){console.error(e)}drainEv();stepFx(dt)}
  frame(now);hudT-=dt;if(hudT<=0){hudT=.2;hud()}
  requestAnimationFrame(loop)}
 function start(){
  S=Sim.S;h=Sim.helpers;GW=Sim.GW;GH=Sim.GH;S.ev=[];
  const c=iso(GW/2,GH/2,1);cam.x=c[0];cam.y=c[1];cam.z=clamp(W/1400,.4,.9);
  requestAnimationFrame(t=>{last=t;loop(t)})}
+let started=false;
 function boot(){fetch(STATE_URL+'?'+Date.now()).then(r=>{if(!r.ok)throw 0;return r.json()}).then(j=>{
- if(!j.state||j.state.v<3)throw 1;Sim.load(j.state);savedAt=j.meta.savedAt||Date.now();
+ if(!j.state||j.state.v<3)throw 1;if(started&&j.meta.savedAt&&j.meta.savedAt<=savedAt){setTimeout(boot,60000);return}Sim.load(j.state);savedAt=j.meta.savedAt||Date.now();
  scale=j.meta.scale||1;speed=scale;markSpeed();
  let behind=Math.min(60,Math.max(0,(Date.now()-savedAt)/1000*scale));
  const total=behind;
  (function chunk(){const t0=performance.now();try{while(behind>0&&performance.now()-t0<30){Sim.step(.5);behind-=.5}}catch(e){console.error(e);behind=0}
   $('clock').textContent='Henter inn '+Math.round(100*(1-behind/Math.max(1,total)))+' %...';
-  if(behind>0)setTimeout(chunk,0);else start()})();
+  if(behind>0)setTimeout(chunk,0);else{S=Sim.S;if(!started){started=true;start()}else{selected=null;S.ev=[]}setTimeout(boot,60000)}})();
 }).catch(e=>{
  if(location.hostname==='localhost'){Sim.create(1234);Sim.advance(300);scale=1;speed=1;start();return}
  $('clock').textContent=e===1?'Venter på at serveren lager en ny verden...':'Finner ikke verdenen ennå, prøver igjen...';
