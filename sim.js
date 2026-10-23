@@ -348,10 +348,10 @@
   }
   function maybeExpand() {
     if (S.time - (S.expT || 0) < 25) return; S.expT = S.time;
-    if (S.sites.some((id) => T(id) && (T(id).what === 'landfill' || T(id).what === 'bridge') && !T(id).done)) return;
-    const pop = S.vill.length; if (pop < 6) return;
+    const pend = S.sites.filter((id) => T(id) && (T(id).what === 'landfill' || T(id).what === 'bridge') && !T(id).done).length;
+    const pop = S.vill.length; if (pop < 6 || pend >= (pop >= 40 ? 4 : 1)) return;
     let trees = 0, rocks = 0; for (let i = 0; i < GW * GH; i++) { if (!S.reach[i]) continue; const o = OB(S.grid[i]); if (o) { if (o.type === 'tree') trees++; else if (o.type === 'rock') rocks++; } }
-    const need = (S.noSpot || 0) > 3 || S.res.wood > 60 && S.res.stone > 12 || trees < 8 || rocks < 4 || (S.res.wood > 40 && S.res.stone > 20);
+    const need = (S.noSpot || 0) > 3 || S.res.wood > 60 && S.res.stone > 12 || trees < 8 || rocks < 4 || (S.res.wood > 40 && S.res.stone > 20) || (S.res.stone > 40 && pop >= 20);
     if (!need) return;
     const bridge = hasTech('bridge') && S.res.wood >= 3, fill = S.res.stone >= 3;
     if (!bridge && !fill) return;
@@ -372,10 +372,12 @@
     if (goal < 0) {
       // no more land to reach: reclaim sea next to the coast, preferring tiles with many land neighbours
       if (!fill) return;
-      let best = null, bs = -1;
-      for (const i of q) { const x = i % GW, y = (i / GW) | 0; if (x < 2 || y < 2 || x > GW - 3 || y > GH - 3 || G(x, y).o) continue; let n = 0; for (const [dx, dy] of NB4) { const g = G(x + dx, y + dy); if (g && g.k !== 'water' && S.reach[(y + dy) * GW + x + dx]) n++; } const sc = n + R() * 1.5; if (sc > bs) { bs = sc; best = i; } }
-      if (best === null || !afford(cost('landfill'))) return;
-      makeSite('landfill', best % GW, (best / GW) | 0);
+      const cands = [];
+      for (const i of q) { const x = i % GW, y = (i / GW) | 0; if (x < 2 || y < 2 || x > GW - 3 || y > GH - 3 || G(x, y).o) continue; let n = 0; for (const [dx, dy] of NB4) { const g = G(x + dx, y + dy); if (g && g.k !== 'water' && S.reach[(y + dy) * GW + x + dx]) n++; } const sc = n + R() * 1.5; cands.push([sc, i]); }
+      cands.sort((a, b) => b[0] - a[0]);
+      if (!cands.length || !afford(cost('landfill'))) return;
+      const take = pend === 0 && S.res.stone >= 40 && pop >= 40 ? 3 : 1, used = [];
+      for (const [, i] of cands) { if (used.length >= take) break; const x = i % GW, y = (i / GW) | 0; if (used.some((u) => Math.abs(u[0] - x) + Math.abs(u[1] - y) < 2)) continue; if (G(x, y).k !== 'water' || G(x, y).o) continue; used.push([x, y]); makeSite('landfill', x, y); }
       if (!S.expLogged || S.time - S.expLogged > 1800) { S.expLogged = S.time; log('De legger ut nytt land i havet.'); }
       return;
     }

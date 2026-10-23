@@ -142,7 +142,7 @@ function stepFx(dt){for(const p of fx){p.life-=dt;if(p.k==='p'){p.x+=p.vx*dt;p.y
 // ---- ui
 const $=id=>document.getElementById(id);
 let shown=0;
-function renderLog(){const el=$('log');const items=S.log.slice(-5);const key=items.length?items[items.length-1].t+items[items.length-1].text:'';if(renderLog.k===key)return;renderLog.k=key;el.replaceChildren(...items.map(l=>{const d=document.createElement('div');d.textContent=l.text;return d}))}
+function renderLog(){const el=$('log');const items=S.log.slice(-3);const key=items.length?items[items.length-1].t+items[items.length-1].text:'';if(renderLog.k===key)return;renderLog.k=key;el.replaceChildren(...items.map(l=>{const d=document.createElement('div');d.textContent=l.text;return d}))}
 let panelOpen=(function(){try{const s=localStorage.getItem('smaaby.panel');if(s!==null)return s==='1'}catch(e){}return innerWidth>=700})();
 const REL={war:'⚔ krig',trade:'⇄ handel',peace:''};
 function hud(){
@@ -193,6 +193,7 @@ const mk=(t,fn,tog,id)=>{const b=document.createElement('button');b.type='button
 function markSpeed(){ctl.querySelectorAll('[data-id^=sp]').forEach(x=>x.setAttribute('aria-pressed',x.dataset.id==='sp'+speed))}
 mk('Pause',b=>{paused=!paused;b.textContent=paused?'Spill':'Pause';b.setAttribute('aria-pressed',paused)},true);
 const ab=mk('Auto-kamera',b=>{auto=!auto;b.setAttribute('aria-pressed',auto)},true);ab.setAttribute('aria-pressed',true);
+let logOn=(function(){try{return localStorage.getItem('smaaby.log')!=='0'}catch(e){return true}})();$('log').hidden=!logOn;const lb=mk('Logg',b=>{logOn=!logOn;$('log').hidden=!logOn;b.setAttribute('aria-pressed',logOn);try{localStorage.setItem('smaaby.log',logOn?'1':'0')}catch(e){}},true);lb.setAttribute('aria-pressed',logOn);
 mk('Token',()=>{const t=prompt('Lim inn GitHub-token (fine-grained, kun repoet Smaaby, Contents: Read and write). Tom = fjern.',tokGet());if(t!==null)tokSet(t.trim())});mk('+',()=>cam.z=clamp(cam.z*1.2,.3,2.4));mk('−',()=>cam.z=clamp(cam.z/1.2,.3,2.4));
 const ptrs=new Map();let drag=false,pd=0,sx0=0,sy0=0;
 cv.addEventListener('pointerdown',e=>{cv.setPointerCapture(e.pointerId);ptrs.set(e.pointerId,[e.clientX,e.clientY]);drag=false;sx0=e.clientX;sy0=e.clientY;if(ptrs.size===2){const [a,b]=[...ptrs.values()];pd=Math.hypot(a[0]-b[0],a[1]-b[1])}});
