@@ -404,10 +404,38 @@
 
   // ---------- research
   function availableTechs() { return Object.keys(TECHS).filter((k) => !S.tech.done[k] && TECHS[k].req.every((r) => S.tech.done[r])); }
+  // Logisk oppfinnelsestre: hver idé krever at folket allerede kan visse ting (navn).
+  const B = (n, c, h, r) => ({ n, cost: { wood: 12, stone: 8 }, color: c, height: h, roof: r });
+  const INV = [
+    ['Fiskeredskap', [], 'food_save'], ['Tørkestativ', ['Fiskeredskap'], 'food_save'], ['Saltlake', ['Tørkestativ'], 'food_save', B('Saltverk', [200, 200, 210], 2.5, 'flat')],
+    ['Kanoer', ['Fiskeredskap'], 'walk'], ['Seilbåter', ['Kanoer', 'Tauverk'], 'walk'], ['Skipsdokk', ['Seilbåter', 'Sagbruk'], 'build', B('Skipsverft', [120, 90, 70], 3, 'flat')],
+    ['Havnehandel', ['Skipsdokk'], 'research', B('Havn', [150, 120, 90], 2.2, 'pointed')], ['Kompass', ['Seilbåter', 'Stjernekunst'], 'walk'], ['Havkart', ['Kompass', 'Kartlegging'], 'research'],
+    ['Vevstol', ['Hjulet'], 'work_speed', B('Veveri', [190, 150, 120], 2.5, 'pointed')], ['Tauverk', ['Vevstol'], 'carry'], ['Klesfarging', ['Vevstol'], 'work_speed'], ['Teppeknyting', ['Klesfarging'], 'work_speed'],
+    ['Smie', ['Bedre verktøy', 'Steinbrudd'], 'build', B('Smie', [90, 80, 80], 2.5, 'flat')], ['Jernverktøy', ['Smie'], 'work_speed'], ['Stålplog', ['Jernverktøy', 'Vanning'], 'farm_growth'], ['Hjulplog', ['Hjulet', 'Vanning'], 'farm_growth'],
+    ['Brenneovn', ['Smie'], 'build', B('Keramikkovn', [180, 100, 70], 2.5, 'dome')], ['Keramikk', ['Brenneovn'], 'food_save'], ['Glassblåsing', ['Brenneovn', 'Steinbrudd'], 'research', B('Glasshytte', [160, 200, 210], 2.8, 'dome')], ['Briller', ['Glassblåsing'], 'research'], ['Kikkert', ['Briller', 'Stjernekunst'], 'research'],
+    ['Skriftruller', ['Stjernekunst'], 'research'], ['Kalender', ['Stjernekunst'], 'farm_growth'], ['Observatorium', ['Kalender', 'Kikkert'], 'research', B('Observatorium', [210, 210, 225], 5, 'dome')], ['Trykkpresse', ['Skriftruller', 'Jernverktøy'], 'research', B('Trykkeri', [150, 130, 110], 3, 'flat')],
+    ['Universitet', ['Trykkpresse', 'Laug'], 'research', B('Universitet', [200, 190, 170], 5, 'pointed')], ['Kartpress', ['Trykkpresse', 'Kartlegging'], 'research'],
+    ['Hagebruk', ['Vanning'], 'farm_growth'], ['Biavl', ['Hagebruk'], 'farm_growth', B('Bikuber', [230, 200, 80], 1.6, 'pointed')], ['Frøbank', ['Hagebruk'], 'farm_growth'], ['Fruktlunder', ['Hagebruk', 'Frøbank'], 'food_save'], ['Dyrehold', ['Hagebruk', 'Tømmerbygg'], 'farm_growth', B('Fjøs', [170, 70, 60], 2.4, 'pointed')],
+    ['Vannhjul', ['Hjulet', 'Sagbruk'], 'work_speed', B('Vannmølle', [140, 110, 80], 3, 'pointed')], ['Dampmaskin', ['Vannhjul', 'Stålplog'], 'work_speed', B('Fabrikk', [100, 100, 110], 4.5, 'flat')], ['Jernbane', ['Dampmaskin', 'Brobygging'], 'walk'], ['Elektrisitet', ['Dampmaskin', 'Observatorium'], 'work_speed'], ['Gatelys', ['Elektrisitet', 'Lykter'], 'work_speed'],
+    ['Akvedukt', ['Murverk', 'Brobygging'], 'pop_cap', B('Akvedukt', [190, 190, 190], 3.5, 'flat')], ['Kloakk', ['Akvedukt'], 'pop_cap'], ['Offentlige bad', ['Akvedukt', 'Keramikk'], 'pop_cap', B('Badehus', [210, 200, 190], 2.5, 'dome')], ['Sykehus', ['Urtemedisin', 'Offentlige bad'], 'pop_cap', B('Sykehus', [235, 235, 235], 3.5, 'flat')],
+    ['Vaksiner', ['Sykehus', 'Briller'], 'food_save'], ['Byvakt', ['Smie', 'Murverk'], 'build', B('Vaktstue', [120, 120, 130], 3, 'flat')], ['Bymur', ['Byvakt', 'Steinbrudd'], 'build', B('Bymur', [160, 160, 170], 3.5, 'flat')],
+    ['Teater', ['Skriftruller', 'Murverk'], 'research', B('Teater', [210, 180, 150], 3.5, 'dome')], ['Trommespråk', [], 'walk'], ['Musikk', ['Trommespråk'], 'work_speed'], ['Gjæringskunst', ['Keramikk', 'Hagebruk'], 'food_save', B('Bryggeri', [160, 110, 60], 2.6, 'pointed')], ['Mosaikk', ['Keramikk', 'Murverk'], 'build'], ['Nattvakt', ['Lykter', 'Byvakt'], 'work_speed'], ['Lysestøperi', ['Lykter', 'Biavl'], 'work_speed'],
+    ['Bank', ['Havnehandel', 'Skriftruller'], 'build', B('Bank', [210, 190, 120], 3.5, 'flat')], ['Børs', ['Bank', 'Trykkpresse'], 'research', B('Børs', [200, 200, 205], 4, 'dome')], ['Postvesen', ['Trykkpresse', 'Jernbane'], 'walk', B('Postkontor', [190, 70, 60], 2.4, 'pointed')],
+    ['Flyging', ['Elektrisitet', 'Observatorium'], 'walk', B('Flyplass', [140, 150, 160], 2, 'flat')], ['Radio', ['Elektrisitet', 'Postvesen'], 'research', B('Radiomast', [180, 180, 190], 6, 'pointed')], ['Datamaskiner', ['Radio', 'Universitet'], 'research', B('Datasenter', [90, 110, 140], 3.5, 'flat')], ['Kunstig intelligens', ['Datamaskiner'], 'research'], ['Romfart', ['Flyging', 'Datamaskiner'], 'research', B('Romhavn', [220, 220, 235], 7, 'pointed')],
+    ['Solceller', ['Elektrisitet', 'Glassblåsing'], 'work_speed', B('Solkraftverk', [60, 90, 150], 1.8, 'flat')], ['Hydroponikk', ['Solceller', 'Hagebruk'], 'farm_growth', B('Drivhus', [170, 220, 200], 2.4, 'dome')], ['Genforskning', ['Vaksiner', 'Datamaskiner'], 'farm_growth']
+  ];
   const SUBJ = ['Fiskeredskap', 'Saltlake', 'Vevstol', 'Kompass', 'Tørkestativ', 'Vannhjul', 'Smie', 'Lysestøperi', 'Tauverk', 'Frøbank', 'Kalender', 'Skriftruller', 'Mosaikk', 'Trommespråk', 'Brenneovn', 'Kartpress', 'Skipsdokk', 'Hagebruk', 'Biavl', 'Glassblåsing', 'Gjæringskunst', 'Nattvakt', 'Teater', 'Observatorium'];
   const RN = ['', ' II', ' III', ' IV', ' V', ' VI', ' VII', ' VIII', ' IX', ' X'];
   function procInvention() {
     const used = new Set(Object.values(S.invInfo).map((i) => i.n));
+    const have = new Set(Object.values(S.invInfo).map((i) => i.n).concat(Object.keys(S.tech.done).map((k) => TECHS[k].n)));
+    const cand = INV.filter((x) => !used.has(x[0]) && x[1].every((q) => have.has(q)));
+    if (cand.length) {
+      const x = cand[Math.floor(R() * cand.length)], type = EFFECTS[x[2]] ? x[2] : 'work_speed', value = Math.round((0.08 + R() * 0.1) * 100) / 100;
+      const p = { n: x[0], d: EFFECTS[type] + ' (+' + Math.round(value * 100) + ' %)', effect: { type, value }, src: 'bygger på ' + (x[1][0] || 'erfaring').toLowerCase() };
+      if (x[3]) p.bld = Object.assign({ max: 3 }, x[3]);
+      return p;
+    }
     let name = null;
     for (let r = 0; r < RN.length && !name; r++) { const fr = SUBJ.filter((x) => !used.has(x + RN[r])); if (fr.length) name = fr[Math.floor(R() * fr.length)] + RN[r]; }
     if (!name) { const g = 2 + Math.floor(S.nInv / SUBJ.length); name = SUBJ[Math.floor(R() * SUBJ.length)] + ' ' + g + '. generasjon'; }
