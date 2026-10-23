@@ -155,7 +155,7 @@
   }
   function create(seed) {
     for (const k in COOL) delete COOL[k];
-    for (const k in ECACHE) delete ECACHE[k];
+    for (const k in ECACHE) delete ECACHE[k]; for (const k in CNT) delete CNT[k];
     S = { v: 4, rs: seed | 0 || 1234567, time: 0, nid: 0, objs: {}, grid: [], log: [], vid: 0, lastDay: -1, nightLogged: false, ev: null, tribes: [], rel: {}, ct: null, deaths: 0 };
     genWorld();
     const c0 = newTribeCtx(0, TNAMES[0]); S.tribes.push(c0); use(c0);
@@ -176,7 +176,7 @@
   }
   function serialize() { return JSON.stringify(snapshot()); }
   function load(json) {
-    for (const k in ECACHE) delete ECACHE[k];
+    for (const k in ECACHE) delete ECACHE[k]; for (const k in CNT) delete CNT[k];
     S = typeof json === 'string' ? JSON.parse(json) : json;
     S.ev = null; S.ct = null;
     if (!S.tribes) { // migrate v3 single-village state
@@ -224,7 +224,13 @@
   }
   const lvl = (v, k) => Math.floor(Math.sqrt(v.sk[k]));
   const skillMult = (v, k) => (1 + 0.05 * lvl(v, k)) * v.dil;
-  const count = (t) => S.blds.filter((id) => T(id) && T(id).type === t).length + S.sites.filter((id) => T(id) && T(id).type === t && !T(id).done).length;
+  const CNT = {};
+  const count = (t) => {
+    const id = S.ct ? S.ct.id : 0, sig = S.blds.length + ':' + Math.floor(S.time / 4), c = CNT[id];
+    if (c && c.sig === sig) return c.m[t] || 0;
+    const m = {}; for (const bid of S.blds) { const o = S.objs[bid]; if (o) m[o.type] = (m[o.type] || 0) + 1; }
+    CNT[id] = { sig, m }; return m[t] || 0;
+  };
   function houses() { return S.blds.filter((id) => T(id) && T(id).type === 'house').length; }
   const phase = () => (S.time % DAYLEN) / DAYLEN;
   const lightAt = (p) => (p < 0.55 ? 1 : p < 0.7 ? 1 - (p - 0.55) / 0.15 : p < 0.92 ? 0 : (p - 0.92) / 0.08);
@@ -340,6 +346,7 @@
   function planner() {
     for (const id of S.sites.slice()) { const st = T(id); if (!st || st.done) continue; if (!st.born) st.born = S.time; if (st.prog === 0 && st.builders === 0 && S.time - st.born > 240) { const c = cost(st.what); for (const k in c) S.res[k] = Math.min(999, S.res[k] + Math.floor(c[k] * 0.8)); S.sites = S.sites.filter((x) => x !== id); dropObj(st); } }
     const open = openSites().length, pop = S.vill.length;
+    if (S.blds.length >= 240) return;
     if (open >= (pop >= 12 ? 3 : pop >= 8 ? 2 : 1)) return;
     const t = nextType();
     if (afford(cost(t))) {
