@@ -10,6 +10,8 @@ export async function consult(summary, token) {
     body: JSON.stringify({ model: 'openai/gpt-4.1-mini', temperature: 1, max_tokens: 900, response_format: { type: 'json_object' }, messages: [{ role: 'system', content: sys }, { role: 'user', content: user }] })
   });
   if (!res.ok) throw new Error('models api ' + res.status + ' ' + (await res.text()).slice(0, 200));
-  const j = await res.json();
-  return JSON.parse(j.choices[0].message.content);
+  const raw = await res.text();
+  let j; try { j = JSON.parse(raw); } catch (e) { throw new Error('svar ikke JSON: ' + raw.slice(0, 120)); }
+  const content = j.choices && j.choices[0] && j.choices[0].message && j.choices[0].message.content;
+  try { return JSON.parse(content); } catch (e) { throw new Error('modellen svarte: ' + String(content).slice(0, 120)); }
 }
