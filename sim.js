@@ -316,7 +316,7 @@
     if (h < 1) return 'house';
     if (f < 1) return 'farm';
     if (p >= c - 1) return 'house';
-    if (f < Math.ceil(p / 4)) return 'farm';
+    if (f < Math.ceil(p / 8)) return 'farm';
     if (count('well') < Math.max(1, Math.ceil(h / 8)) && h >= 3) return 'well';
     if (count('library') < Math.max(1, Math.ceil(h / 12)) && h >= 4) return 'library';
     if (count('store') < Math.max(1, Math.ceil(h / 10)) && h >= 4) return 'store';
@@ -346,7 +346,7 @@
       const g = G(x + i, y + j);
       if (!g || g.o || (g.k !== 'grass' && g.k !== 'sand') || g.h !== g0.h || !S.reach[(y + j) * GW + x + i]) return false;
     }
-    if (sz === 1) { for (const [dx, dy] of NB4) { const o = OB(G(x + dx, y + dy)); if (o && (o.type === 'tent' || o.type === 'fire' || o.type === 'site' || (o.size && o.type !== 'farm'))) return false; } }
+    if (sz === 1) { for (const [dx, dy] of NB4) { const o = OB(G(x + dx, y + dy)); if (o && (o.type === 'tent' || o.type === 'fire' || o.type === 'site')) return false; } }
     else { for (let j = -1; j <= sz; j++) for (let i = -1; i <= sz; i++) { const o = OB(G(x + i, y + j)); if (o && o.type === 'fire') return false; } }
     return true;
   }
@@ -407,7 +407,8 @@
         }
       }
     }
-    if (S.blds.length >= 420) return;
+    if (S.res.food > 700 && S.time - (S.farmT || 0) > 30) { S.farmT = S.time; const fl = S.blds.map(T).filter((o) => o && o.type === 'farm'); if (fl.length > Math.ceil(pop / 6) + 2) destroyBld(fl[fl.length - 1]); }
+    if (S.blds.length >= 420) { maybeExpand(); return; }
     if (open >= (pop >= 12 ? 3 : pop >= 8 ? 2 : 1)) return;
     const t = nextType();
     if (afford(cost(t))) {
@@ -420,7 +421,7 @@
   function maybeExpand() {
     if (S.time - (S.expT || 0) < 10) return; S.expT = S.time;
     const pend = S.sites.filter((id) => T(id) && (T(id).what === 'landfill' || T(id).what === 'bridge') && !T(id).done).length;
-    const pop = S.vill.length; if (pop < 6 || pend >= (pop >= 40 ? 8 : 1)) return;
+    const pop = S.vill.length; if (pop < 6 || pend >= (pop >= 40 ? 12 : 1)) return;
     let trees = 0, rocks = 0; for (let i = 0; i < GW * GH; i++) { if (!S.reach[i]) continue; const o = OB(S.grid[i]); if (o) { if (o.type === 'tree') trees++; else if (o.type === 'rock') rocks++; } }
     const need = (S.noSpot || 0) > 3 || S.res.wood > 60 && S.res.stone > 12 || trees < 8 || rocks < 4 || (S.res.wood > 40 && S.res.stone > 20) || (S.res.stone > 40 && pop >= 20);
     if (!need) return;
@@ -447,7 +448,7 @@
       for (const i of q) { const x = i % GW, y = (i / GW) | 0; if (x < 2 || y < 2 || x > GW - 3 || y > GH - 3 || G(x, y).o) continue; let n = 0; for (const [dx, dy] of NB4) { const g = G(x + dx, y + dy); if (g && g.k !== 'water' && S.reach[(y + dy) * GW + x + dx]) n++; } const sc = n + R() * 1.5; cands.push([sc, i]); }
       cands.sort((a, b) => b[0] - a[0]);
       if (!cands.length || !afford(cost('landfill'))) return;
-      const take = S.res.stone >= 40 && pop >= 40 ? Math.min(6, 8 - pend) : 1, used = [];
+      const take = S.res.stone >= 40 && pop >= 40 ? Math.min(8, 12 - pend) : 1, used = [];
       for (const [, i] of cands) { if (used.length >= take) break; const x = i % GW, y = (i / GW) | 0; if (used.some((u) => Math.abs(u[0] - x) + Math.abs(u[1] - y) < 2)) continue; if (G(x, y).k !== 'water' || G(x, y).o) continue; used.push([x, y]); makeSite('landfill', x, y); }
       if (!S.expLogged || S.time - S.expLogged > 1800) { S.expLogged = S.time; log('De legger ut nytt land i havet.'); }
       return;
@@ -985,6 +986,6 @@
     trim, GW, GH, DAYLEN, DT, DEF, TECHS, NB4, EFFECTS,
     get S() { return S; },
     create, load, serialize, snapshot, step, advance, scan,
-    helpers: { wonderNext, wonderSpot, eraOf, era, defOf, eff, techInfo, applyCouncil, summary, sanitize, withT, ctxById, relOf, trait2label, G, OB, T, elev, phase, light, cap, hasTech, lvl, houses, count, nextType, availableTechs, tile, walkable }
+    helpers: { findSpot, fits, center, wonderNext, wonderSpot, eraOf, era, defOf, eff, techInfo, applyCouncil, summary, sanitize, withT, ctxById, relOf, trait2label, G, OB, T, elev, phase, light, cap, hasTech, lvl, houses, count, nextType, availableTechs, tile, walkable }
   };
 });
