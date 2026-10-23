@@ -782,7 +782,8 @@
     S.planT -= dt; if (S.planT <= 0) { S.planT = 2; planner(); }
     S.scanT -= dt; if (S.scanT <= 0) { S.scanT = hasTech('cartog') ? 10 : 20; scan(); }
     S.growT += dt;
-    if (S.growT >= (hasTech('harvest') ? 30 : 45)) { S.growT = 0; if (S.res.food >= 8 && S.vill.length < cap() && S.vill.length < 600) { const f = S.storages.map(T).find(Boolean); if (f) { addVillager(f.x, f.y + 2); if (S.vill.length % 5 === 0) log('Folket har nå ' + S.vill.length + ' innbyggere.'); } } }
+    if (S.vill.length > 110) for (let k = 0; k < 8 && S.vill.length > 100; k++) die(S.vill[S.vill.length - 1], 'dro på langferd');
+    if (S.growT >= (hasTech('harvest') ? 30 : 45)) { S.growT = 0; if (S.res.food >= 8 && S.vill.length < cap() && S.vill.length < 100) { const f = S.storages.map(T).find(Boolean); if (f) { addVillager(f.x, f.y + 2); if (S.vill.length % 5 === 0) log('Folket har nå ' + S.vill.length + ' innbyggere.'); } } }
     S.eatT += dt;
     if (S.eatT >= 60) {
       S.eatT = 0; S.res.food = Math.max(0, S.res.food - Math.ceil(S.vill.length * (hasTech('medicine') ? 0.45 : 0.6) / eff('food_save')));

@@ -11,6 +11,7 @@ publish() {
 while [ "$(date +%s)" -lt "$END" ]; do
   git fetch -q origin state --depth=1 2>/dev/null && git show FETCH_HEAD:state.json > state.json 2>/dev/null || true
   git fetch -q origin main --depth=1 2>/dev/null && git show FETCH_HEAD:speed.json > speed.json 2>/dev/null || true
+  for f in sim.js tick.mjs council.mjs world.json; do git show FETCH_HEAD:$f > $f.new 2>/dev/null && [ -s $f.new ] && mv $f.new $f || rm -f $f.new; done
   node tick.mjs || echo "tick failed"
   publish || echo "publish failed"
   sleep 60
