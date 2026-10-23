@@ -121,6 +121,7 @@ function frame(clock){
  for(const p of fx){if(p.k==='p'){const c=iso(p.x,p.y,p.h);ctx.fillStyle=rgb(p.c,1,Math.min(1,p.life*1.4));ctx.fillRect(c[0]-1.5,c[1]-1.5,3,3)}}
  ctx.font='bold 12px "IBM Plex Mono",monospace';ctx.textAlign='center';
  for(const f of fx){if(f.k==='f'){const c=iso(f.x,f.y,f.h);ctx.fillStyle=f.c;ctx.globalAlpha=Math.min(1,f.life);ctx.fillText(f.t,c[0],c[1]);ctx.globalAlpha=1}else if(f.k==='s'){const c=iso(f.x,f.y,f.h);ctx.fillStyle='rgba(255,230,120,'+Math.min(1,f.life)+')';ctx.font='bold 18px sans-serif';ctx.fillText('✦',c[0],c[1]);ctx.font='bold 12px "IBM Plex Mono",monospace'}}
+ drawShow();
  const ln=lights.filter(Boolean);ctx.restore();
  const nd=1-light;
  ctx.save();
@@ -130,6 +131,36 @@ function frame(clock){
  ctx.restore();
 }
 function isNearLand(x,y){for(let j=-3;j<=3;j++)for(let i=-3;i<=3;i++){const g=h.G(x+i,y+j);if(g&&g.k!=='water')return true}return false}
+
+// ---- show: raketter, skip, fly, røyk og fyrverkeri over særegne bygg
+let show=[],lmT=0,LM=[];const LS={};
+function scanLM(){const out=[];for(const t of S.tribes){if(!t.alive)continue;for(const id of t.blds){const o=S.objs[id];if(!o)continue;const d=t.defs&&t.defs[o.type];out.push({n:d?d.n:o.type,x:o.x,y:o.y,id:o.id})}}if(window.__fakeLM)for(const f of window.__fakeLM)out.push(f);LM=out}
+const gH=(x,y)=>{const g=h.G(Math.floor(x),Math.floor(y));return g?g.h:0};
+const isW=(x,y)=>{const g=h.G(Math.floor(x),Math.floor(y));return !!g&&g.k==='water'&&!g.o};
+function stepShow(dt){
+ lmT-=dt;if(lmT<=0){lmT=2;scanLM()}
+ const night=light<.5;
+ for(const l of LM){const st=LS[l.id]||(LS[l.id]={a:Math.random()*5,ships:0});st.a-=dt;const e=gH(l.x,l.y);
+  if(/^(Fabrikk|Smie|Keramikkovn|Brenneovn|Glasshytte)/.test(l.n)){st.b=(st.b||0)-dt;if(st.b<=0){st.b=.55;show.push({k:'sm',x:l.x+.5,y:l.y+.5,h:e+(l.n==='Fabrikk'?5:3),life:3.4,vx:.2,vy:-.12,vz:.8})}}
+  else if(l.n==='castle'||l.n==='Slott'){if(night&&st.a<=0){st.a=3+Math.random()*5;const cx=l.x+.5+(Math.random()-.5)*4,cy=l.y+.5+(Math.random()-.5)*4,ch=e+10+Math.random()*5,col=[[255,90,90],[255,210,90],[120,200,255],[190,130,255],[120,255,160]][Math.floor(Math.random()*5)];for(let k=0;k<34;k++){const a=Math.random()*6.28,s=1.2+Math.random()*1.4,pz=(Math.random()-.5)*2.4;fx.push({k:'p',x:cx,y:cy,h:ch,vx:Math.cos(a)*s*.7,vy:Math.sin(a)*s*.7,vz:pz+1,life:1.3,c:col})}}}
+  else if(l.n==='Romhavn'){if(st.a<=0){st.a=30+Math.random()*30;show.push({k:'rk',x:l.x+.5,y:l.y+.5,h:e+4,v:0,life:11,ex:0})}}
+  else if(l.n==='Flyplass'){if(st.a<=0){st.a=22+Math.random()*25;show.push({k:'pl',x:l.x,y:l.y,h:e+.5,t:0,life:9,dx:Math.random()<.5?1:-1,dy:Math.random()<.5?1:-1})}}
+  else if(l.n==='Havn'||l.n==='Skipsverft'){if(st.a<=0&&st.ships<2){st.a=6;for(let t=0;t<30;t++){const x=l.x+Math.floor((Math.random()-.5)*12),y=l.y+Math.floor((Math.random()-.5)*12);if(isW(x,y)){show.push({k:'sh',x:x+.5,y:y+.5,d:Math.floor(Math.random()*4),life:60,own:l.id});st.ships++;break}}}}
+ }
+ let ships={};
+ for(const p of show){p.life-=dt;
+  if(p.k==='sm'){p.x+=p.vx*dt;p.y+=p.vy*dt;p.h+=p.vz*dt}
+  else if(p.k==='rk'){p.v+=(p.life<10.2?4.5:0)*dt;p.h+=p.v*dt;p.ex-=dt;if(p.life<10.8&&p.ex<=0){p.ex=.05;show.push({k:'sm',x:p.x,y:p.y,h:p.h-.6,life:1.6,vx:(Math.random()-.5)*.3,vy:(Math.random()-.5)*.3,vz:-.3,fire:1})}}
+  else if(p.k==='pl'){p.t+=dt;p.x+=p.dx*dt*5;p.y+=p.dy*dt*5;p.h+=dt*1.6}
+  else if(p.k==='sh'){const D=[[1,0],[0,1],[-1,0],[0,-1]][p.d],nx=p.x+D[0]*dt*.9,ny=p.y+D[1]*dt*.9;if(isW(nx,ny)&&isW(nx+D[0]*.6,ny+D[1]*.6)){p.x=nx;p.y=ny}else{const o=[0,1,2,3].filter(d=>{const E=[[1,0],[0,1],[-1,0],[0,-1]][d];return isW(p.x+E[0]*1.2,p.y+E[1]*1.2)});if(o.length)p.d=o[Math.floor(Math.random()*o.length)];else p.life=0}}}
+ for(const p of show)if(p.k==='sh'&&p.life<=0&&LS[p.own])LS[p.own].ships=Math.max(0,LS[p.own].ships-1);
+ show=show.filter(p=>p.life>0);if(show.length>80)show.splice(0,show.length-80)}
+function drawShow(){
+ for(const p of show){
+  if(p.k==='sm'){const c=iso(p.x,p.y,p.h),a=Math.min(.55,p.life/3.4*.55);if(p.fire){ctx.fillStyle='rgba(255,'+(150+p.life*40|0)+',60,'+Math.min(1,p.life)+')';ctx.beginPath();ctx.arc(c[0],c[1],3,0,6.3);ctx.fill()}else{ctx.fillStyle='rgba(210,210,216,'+a+')';ctx.beginPath();ctx.arc(c[0],c[1],4+(3.4-p.life)*3,0,6.3);ctx.fill()}}
+  else if(p.k==='rk'){const c=iso(p.x,p.y,p.h);ctx.fillStyle='#f2f2f4';ctx.fillRect(c[0]-3,c[1]-16,6,16);ctx.fillStyle='#d94a4a';ctx.beginPath();ctx.moveTo(c[0]-3,c[1]-16);ctx.lineTo(c[0],c[1]-23);ctx.lineTo(c[0]+3,c[1]-16);ctx.fill();ctx.fillRect(c[0]-6,c[1]-4,3,6);ctx.fillRect(c[0]+3,c[1]-4,3,6);if(p.v>0){ctx.fillStyle='#ffb347';ctx.beginPath();ctx.moveTo(c[0]-3,c[1]);ctx.lineTo(c[0],c[1]+10+Math.random()*6);ctx.lineTo(c[0]+3,c[1]);ctx.fill()}}
+  else if(p.k==='pl'){const c=iso(p.x,p.y,p.h),s=iso(p.x,p.y,gH(p.x,p.y));ctx.fillStyle='rgba(0,0,0,.18)';ctx.beginPath();ctx.ellipse(s[0],s[1],8,3,0,0,6.3);ctx.fill();ctx.fillStyle='#f4f6fa';ctx.beginPath();ctx.ellipse(c[0],c[1],9,2.6,0,0,6.3);ctx.fill();ctx.fillRect(c[0]-2,c[1]-6,4,12);ctx.fillStyle='#d94a4a';ctx.fillRect(c[0]+6,c[1]-5,2,5)}
+  else if(p.k==='sh'){const c=iso(p.x,p.y,.15);ctx.fillStyle='#5a3a24';ctx.beginPath();ctx.moveTo(c[0]-9,c[1]-2);ctx.lineTo(c[0]+9,c[1]-2);ctx.lineTo(c[0]+5,c[1]+3);ctx.lineTo(c[0]-5,c[1]+3);ctx.fill();ctx.fillStyle='#f4f1e6';ctx.beginPath();ctx.moveTo(c[0],c[1]-3);ctx.lineTo(c[0],c[1]-17);ctx.lineTo(c[0]+8,c[1]-4);ctx.fill();ctx.fillStyle='rgba(255,255,255,.35)';ctx.fillRect(c[0]-12,c[1]+3,24,1.5)}}}
 // ---- fx from sim events
 function drainEv(){
  const ev=S.ev;if(!ev)return;
@@ -213,7 +244,7 @@ const STATE_URL=(function(){const m=location.hostname.match(/^([^.]+)\.github\.i
 let last=performance.now(),hudT=0;
 function loop(now){
  const dt=Math.min(.1,(now-last)/1000);last=now;
- if(!paused){let rem=dt*speed;try{const t0=performance.now();while(rem>0&&performance.now()-t0<9){const s=Math.min(rem>.6?.5:.1,rem);Sim.step(s);rem-=s}}catch(e){console.error(e)}drainEv();stepFx(dt)}
+ if(!paused){let rem=dt*speed;try{const t0=performance.now();while(rem>0&&performance.now()-t0<9){const s=Math.min(rem>.6?.5:.1,rem);Sim.step(s);rem-=s}}catch(e){console.error(e)}drainEv();stepFx(dt)}try{stepShow(dt)}catch(e){console.error(e)}
  frame(now);hudT-=dt;if(hudT<=0){hudT=.2;hud()}
  requestAnimationFrame(loop)}
 function start(){
