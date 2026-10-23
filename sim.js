@@ -410,7 +410,7 @@
     const used = new Set(Object.values(S.invInfo).map((i) => i.n));
     let name = null;
     for (let r = 0; r < RN.length && !name; r++) { const fr = SUBJ.filter((x) => !used.has(x + RN[r])); if (fr.length) name = fr[Math.floor(R() * fr.length)] + RN[r]; }
-    if (!name) name = 'Mysterium ' + (S.nInv + 1);
+    if (!name) { const g = 2 + Math.floor(S.nInv / SUBJ.length); name = SUBJ[Math.floor(R() * SUBJ.length)] + ' ' + g + '. generasjon'; }
     const types = Object.keys(EFFECTS), type = types[Math.floor(R() * types.length)], value = Math.round((0.06 + R() * 0.1) * 100) / 100;
     const p = { n: name, d: EFFECTS[type] + ' (+' + Math.round(value * 100) + ' %)', effect: { type, value }, src: 'folkets egne idéer' };
     if (R() < 0.4) p.bld = { n: name.replace(/ [IVX]+$/, '') + 'hus', cost: { wood: 10 + Math.floor(R() * 10), stone: 4 + Math.floor(R() * 10) }, color: [80 + Math.floor(R() * 150), 80 + Math.floor(R() * 130), 80 + Math.floor(R() * 150)], height: 1.5 + Math.floor(R() * 3), roof: ROOFS[Math.floor(R() * 3)], max: 3 };
