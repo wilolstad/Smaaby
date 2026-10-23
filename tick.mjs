@@ -37,7 +37,6 @@ if (raw) {
   meta = { bornAt: now };
   console.log('A new island is born');
 }
-try { const r = await fetch('https://api.anthropic.com/v1/messages', { method: 'POST', headers: { 'content-type': 'application/json' }, body: '{}' }); meta.probe = 'anthropic ' + r.status + ' ' + (await r.text()).slice(0, 60); } catch (e) { meta.probe = 'anthropic feil ' + String(e.message || e).slice(0, 60); }
 meta.savedAt = now - (meta.lag || 0);
 meta.scale = SCALE;
 meta.epoch = EPOCH;
