@@ -18,7 +18,10 @@ if (raw) {
   Sim.load(raw.state);
   const elapsed = Math.min(MAX_CATCHUP, Math.max(0, ((now - (meta.savedAt || now)) / 1000) * SCALE));
   console.log(`Fast-forwarding ${elapsed.toFixed(0)} s of village life`);
-  Sim.advance(elapsed);
+  Sim.trim(100);
+  const t0 = Date.now(); let done = 0;
+  while (done < elapsed && Date.now() - t0 < 45000) { const d = Math.min(30, elapsed - done); Sim.advance(d); done += d; }
+  if (done < elapsed) { console.log(`Behind: ${(elapsed - done).toFixed(0)} s left`); meta.lag = ((elapsed - done) / SCALE) * 1000; } else meta.lag = 0;
   try {
     const H = Sim.helpers, S0 = Sim.S;
     const cand = S0.tribes.filter((c) => c.alive && c.invq.length < 2);
@@ -33,7 +36,7 @@ if (raw) {
   meta = { bornAt: now };
   console.log('A new island is born');
 }
-meta.savedAt = now;
+meta.savedAt = now - (meta.lag || 0);
 meta.scale = SCALE;
 meta.epoch = EPOCH;
 meta.bornAt = meta.bornAt || now;

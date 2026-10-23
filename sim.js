@@ -57,11 +57,20 @@
   }
   const defOf = (t) => DEF[t] || (S && S.defs && S.defs[t]);
   const techInfo = (k) => TECHS[k] || (S.invInfo && S.invInfo[k]);
+  const ECACHE = {};
+  function effSums() {
+    const id = S.ct ? S.ct.id : 0, sig = S.nInv + ':' + S.blds.length, c = ECACHE[id];
+    if (c && c.sig === sig) return c.sums;
+    const sums = {}, cnt = {};
+    for (const bid of S.blds) { const o = S.objs[bid]; if (o) cnt[o.type] = (cnt[o.type] || 0) + 1; }
+    for (const key in S.inv) { const i = S.invInfo[key]; if (i && i.effect) sums[i.effect.type] = (sums[i.effect.type] || 0) + i.effect.value * (S.defs[key] ? Math.min(6, cnt[key] || 0) : 1); }
+    ECACHE[id] = { sig, sums };
+    return sums;
+  }
   function eff(k) {
-    let s = 0, m = 1;
+    let m = 1;
     if (S.ct) { const c = S.cul; if (k === 'research') m = c.sci; else if (k === 'build') m = c.build; else if (k === 'farm_growth') m = c.farm; else if (k === 'work_speed') m = c.ind; }
-    for (const key in S.inv) { const i = S.invInfo[key]; if (i && i.effect && i.effect.type === k) s += i.effect.value * (S.defs[key] ? Math.min(6, S.blds.filter((id) => S.objs[id] && S.objs[id].type === key).length) : 1); }
-    return Math.min(k === 'pop_cap' ? 1.6 : 6, 1 + s) * m;
+    return Math.min(k === 'pop_cap' ? 1.6 : 6, 1 + (effSums()[k] || 0)) * m;
   }
   const eraOf = (n, t) => { n += t; return n >= 700 ? 4 : n >= 300 ? 3 : n >= 100 ? 2 : n >= 25 ? 1 : 0; };
   const era = () => eraOf(S.nInv, Object.keys(S.tech.done).length);
@@ -145,6 +154,7 @@
     [[-2, 1], [2, -1]].forEach(([dx, dy]) => { const g = G(x + dx, y + dy); if (g && !g.o && g.k !== 'water') setObj(x + dx, y + dy, newObj({ type: 'tent', x: x + dx, y: y + dy, size: 1, cap: 2, sleepers: 0, tribe: c.id })); });
   }
   function create(seed) {
+    for (const k in ECACHE) delete ECACHE[k];
     S = { v: 4, rs: seed | 0 || 1234567, time: 0, nid: 0, objs: {}, grid: [], log: [], vid: 0, lastDay: -1, nightLogged: false, ev: null, tribes: [], rel: {}, ct: null, deaths: 0 };
     genWorld();
     const c0 = newTribeCtx(0, TNAMES[0]); S.tribes.push(c0); use(c0);
@@ -165,6 +175,7 @@
   }
   function serialize() { return JSON.stringify(snapshot()); }
   function load(json) {
+    for (const k in ECACHE) delete ECACHE[k];
     S = typeof json === 'string' ? JSON.parse(json) : json;
     S.ev = null; S.ct = null;
     if (!S.tribes) { // migrate v3 single-village state
@@ -835,8 +846,9 @@
     let n = Math.floor(seconds / DT); const total = n;
     while (n-- > 0) { step(DT); if (onStep && n % 200 === 0) onStep(total - n, total); }
   }
+  function trim(max) { for (const c of S.tribes) withT(c, () => { while (S.vill.length > max) die(S.vill[S.vill.length - 1], 'dro på langferd'); }); }
   return {
-    GW, GH, DAYLEN, DT, DEF, TECHS, NB4, EFFECTS,
+    trim, GW, GH, DAYLEN, DT, DEF, TECHS, NB4, EFFECTS,
     get S() { return S; },
     create, load, serialize, snapshot, step, advance, scan,
     helpers: { eraOf, era, defOf, eff, techInfo, applyCouncil, summary, sanitize, withT, ctxById, relOf, trait2label, G, OB, T, elev, phase, light, cap, hasTech, lvl, houses, count, nextType, availableTechs, tile, walkable }
