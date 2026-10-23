@@ -28,9 +28,10 @@ if (raw) {
     if (process.env.GITHUB_TOKEN && cand.length) {
       const c = cand[Math.floor(now / 60000) % cand.length];
       const r = await consult(H.withT(c, () => H.summary()), process.env.GITHUB_TOKEN);
-      console.log('Council of', c.name, 'proposed', H.withT(c, () => H.applyCouncil(r)), 'inventions');
+      const n = H.withT(c, () => H.applyCouncil(r)); meta.council = c.name + ' ok ' + n + ' @' + new Date().toISOString();
+      console.log('Council of', c.name, 'proposed', n, 'inventions');
     }
-  } catch (e) { console.log('Council unavailable:', String(e.message || e).slice(0, 200)); }
+  } catch (e) { meta.council = 'feil: ' + String(e.message || e).slice(0, 160); console.log('Council unavailable:', meta.council); }
 } else {
   Sim.create((now & 0x7fffffff) | 1);
   meta = { bornAt: now };
