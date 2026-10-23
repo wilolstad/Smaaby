@@ -347,9 +347,10 @@
   }
   function findSpot(type) {
     const sz = defOf(type).size, [cx, cy] = center(), c = [];
-    const maxR = 12 + Math.sqrt(S.blds.length) * 3;
+    const maxR = 16 + Math.sqrt(S.blds.length) * 4, lane = type !== 'farm' && sz <= 3;
     for (let y = 2; y < GH - 3; y++) for (let x = 2; x < GW - 3; x++) {
       const d = Math.hypot(x - cx, y - cy); if (d < 2.2 || d > maxR) continue;
+      if (lane) { let bad = false; for (let j = 0; j < sz && !bad; j++) for (let i = 0; i < sz; i++) if ((x + i) % 4 === 3 || (y + j) % 4 === 3) { bad = true; break; } if (bad) continue; }
       c.push([d + R() * 2.5, x, y]);
     }
     c.sort((a, b) => a[0] - b[0]);
@@ -412,9 +413,9 @@
     maybeExpand();
   }
   function maybeExpand() {
-    if (S.time - (S.expT || 0) < 25) return; S.expT = S.time;
+    if (S.time - (S.expT || 0) < 10) return; S.expT = S.time;
     const pend = S.sites.filter((id) => T(id) && (T(id).what === 'landfill' || T(id).what === 'bridge') && !T(id).done).length;
-    const pop = S.vill.length; if (pop < 6 || pend >= (pop >= 40 ? 4 : 1)) return;
+    const pop = S.vill.length; if (pop < 6 || pend >= (pop >= 40 ? 8 : 1)) return;
     let trees = 0, rocks = 0; for (let i = 0; i < GW * GH; i++) { if (!S.reach[i]) continue; const o = OB(S.grid[i]); if (o) { if (o.type === 'tree') trees++; else if (o.type === 'rock') rocks++; } }
     const need = (S.noSpot || 0) > 3 || S.res.wood > 60 && S.res.stone > 12 || trees < 8 || rocks < 4 || (S.res.wood > 40 && S.res.stone > 20) || (S.res.stone > 40 && pop >= 20);
     if (!need) return;
@@ -441,7 +442,7 @@
       for (const i of q) { const x = i % GW, y = (i / GW) | 0; if (x < 2 || y < 2 || x > GW - 3 || y > GH - 3 || G(x, y).o) continue; let n = 0; for (const [dx, dy] of NB4) { const g = G(x + dx, y + dy); if (g && g.k !== 'water' && S.reach[(y + dy) * GW + x + dx]) n++; } const sc = n + R() * 1.5; cands.push([sc, i]); }
       cands.sort((a, b) => b[0] - a[0]);
       if (!cands.length || !afford(cost('landfill'))) return;
-      const take = pend === 0 && S.res.stone >= 40 && pop >= 40 ? 3 : 1, used = [];
+      const take = S.res.stone >= 40 && pop >= 40 ? Math.min(6, 8 - pend) : 1, used = [];
       for (const [, i] of cands) { if (used.length >= take) break; const x = i % GW, y = (i / GW) | 0; if (used.some((u) => Math.abs(u[0] - x) + Math.abs(u[1] - y) < 2)) continue; if (G(x, y).k !== 'water' || G(x, y).o) continue; used.push([x, y]); makeSite('landfill', x, y); }
       if (!S.expLogged || S.time - S.expLogged > 1800) { S.expLogged = S.time; log('De legger ut nytt land i havet.'); }
       return;
